@@ -479,7 +479,9 @@ class Mascot:
         self._init_sound()
 
         # ── 전역 입력 리스너 ──────────────────────────────────────────────
-        self._kb = keyboard.Listener(on_press=self._on_key)
+        self._held = set()
+        self._kb = keyboard.Listener(on_press=self._on_key,
+                                     on_release=self._on_key_release)
         self._ms = mouse.Listener(on_click=self._on_click, on_move=self._on_move)
         self._kb.daemon = self._ms.daemon = True
         self._kb.start()
@@ -661,14 +663,21 @@ class Mascot:
                 self.pensnd = None
 
     # ── 입력 콜백 ─────────────────────────────────────────────────────────
-    def _on_key(self, _key):
+    def _on_key(self, key):
         self.key_events += 1
+        # 꾹 누르고 있을 때의 자동 반복은 소리 제외 — 최초 눌림만 소리
+        k = str(key)
+        first = k not in self._held
+        self._held.add(k)
         sp = self.sndpack
-        if sp is not None:
+        if first and sp is not None:
             try:
-                sp.play(_key)
+                sp.play(key)
             except Exception:
                 pass
+
+    def _on_key_release(self, key):
+        self._held.discard(str(key))
 
     def _on_click(self, _x, _y, _button, pressed):
         self.mouse_pressed = pressed
