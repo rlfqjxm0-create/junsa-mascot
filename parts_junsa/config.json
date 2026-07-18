@@ -1,0 +1,11 @@
+{
+ "name": "준사",
+ "scale": 0.34,
+ "screen_quad": [[258, 1038], [482, 1056], [458, 1122], [232, 1103]],
+ "blink": null,
+ "trail_color": "#9fd8ff",
+ "pen_tip": [37, 96],
+ "arm_key_offset": [-32, 0],
+ "hard_alpha": true,
+ "timer": {"enabled": true, "idle_sec": 15}
+}
