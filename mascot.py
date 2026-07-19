@@ -281,64 +281,43 @@ class SoundPack:
 
 
 class PenSound:
-    """긴 연필 루프 음원에서 매번 랜덤 구간을 잘라 재생. 펜을 떼면 즉시 끊는다.
+    """선을 긋기 시작할 때 연필 클립 하나를 랜덤 재생. 펜을 떼면 즉시 끊는다.
 
-    짧은 클립 여러 개가 아니라 긴 한 파일이 들어오므로, 재생마다 임의의
-    시작점에서 짧은 구간을 떼어낸다. 잘린 경계의 툭 소리를 막으려고
-    구간 앞뒤에 짧은 페이드를 건다.
+    긴 루프를 소리 나는 구간별로 잘라 만든 클립들(cut_pen_sound.py)을 사용하므로
+    항상 실제 소리가 나고 움직임과 어긋나지 않는다.
     """
 
     def __init__(self, folder, volume=35):
         import wave
-        wavs = [f for f in os.listdir(folder) if f.lower().endswith(".wav")]
-        if not wavs:
+        self.sounds = []          # (WAVEFORMATEX, 버퍼, 길이)
+        for f in sorted(os.listdir(folder)):
+            if not f.lower().endswith(".wav"):
+                continue
+            with wave.open(os.path.join(folder, f), "rb") as w:
+                ch, sw, fr = w.getnchannels(), w.getsampwidth(), w.getframerate()
+                data = w.readframes(w.getnframes())
+            wfx = _WAVEFORMATEX(1, ch, fr, fr * ch * sw, ch * sw, sw * 8, 0)
+            self.sounds.append((wfx, ctypes.create_string_buffer(data, len(data)),
+                                len(data)))
+        if not self.sounds:
             raise ValueError("펜 소리 wav 없음")
-        # 가장 큰(= 가장 긴) wav를 루프 음원으로 사용
-        path = max((os.path.join(folder, f) for f in wavs), key=os.path.getsize)
-        with wave.open(path, "rb") as w:
-            self.ch, self.sw, self.fr = (w.getnchannels(), w.getsampwidth(),
-                                         w.getframerate())
-            self.pcm = w.readframes(w.getnframes())
-        self.fb = self.ch * self.sw                 # 프레임당 바이트
-        self.nframes = len(self.pcm) // self.fb
-        self.wfx = _WAVEFORMATEX(1, self.ch, self.fr, self.fr * self.fb,
-                                 self.fb, self.sw * 8, 0)
         self.volume = volume
         self._cur = None          # (핸들, WAVEHDR)
-        self._buf = None          # 재생 중 세그먼트 버퍼 유지
-
-    def _segment(self, seg=(0.45, 1.1)):
-        """랜덤 시작점의 [seg] 초 구간 PCM (16bit 페이드 적용)."""
-        import array
-        n = int(random.uniform(*seg) * self.fr)
-        n = min(n, self.nframes)
-        start = random.randint(0, max(self.nframes - n, 0))
-        raw = self.pcm[start * self.fb:(start + n) * self.fb]
-        a = array.array("h")
-        a.frombytes(raw)
-        fade = min(int(self.fr * 0.008), len(a) // 2)   # 8ms 페이드 인/아웃
-        for i in range(fade):
-            g = i / fade
-            a[i] = int(a[i] * g)
-            a[-1 - i] = int(a[-1 - i] * g)
-        return a.tobytes()
 
     def play_once(self):
-        """랜덤 구간 하나를 새로 재생 (선 긋기 시작 시 1회 호출)."""
+        """랜덤 클립 하나를 새로 재생 (선 긋기 시작 시 1회 호출)."""
         wm = ctypes.windll.winmm
         if self._cur is not None:
             self._release()
-        seg = self._segment()
-        self._buf = ctypes.create_string_buffer(seg, len(seg))
+        wfx, buf, ln = random.choice(self.sounds)
         h = ctypes.c_void_p()
-        if wm.waveOutOpen(ctypes.byref(h), 0xFFFFFFFF, ctypes.byref(self.wfx),
-                          0, 0, 0):
+        if wm.waveOutOpen(ctypes.byref(h), 0xFFFFFFFF, ctypes.byref(wfx), 0, 0, 0):
             return
         v = max(0, min(int(self.volume * 0xFFFF / 100), 0xFFFF))
         wm.waveOutSetVolume(h, v | (v << 16))
         hdr = _WAVEHDR()
-        hdr.lpData = ctypes.cast(self._buf, ctypes.c_void_p)
-        hdr.dwBufferLength = len(seg)
+        hdr.lpData = ctypes.cast(buf, ctypes.c_void_p)
+        hdr.dwBufferLength = ln
         wm.waveOutPrepareHeader(h, ctypes.byref(hdr), ctypes.sizeof(_WAVEHDR))
         wm.waveOutWrite(h, ctypes.byref(hdr), ctypes.sizeof(_WAVEHDR))
         self._cur = (h, hdr)
@@ -354,6 +333,52 @@ class PenSound:
         wm.waveOutUnprepareHeader(h, ctypes.byref(hdr), ctypes.sizeof(_WAVEHDR))
         wm.waveOutClose(h)
         self._cur = None
+
+
+# ── 입력이 태블릿 펜인지 판별 (WH_MOUSE_LL 저수준 훅) ────────────────────────
+# Windows Ink이 켜져 있으면 펜/터치가 만든 마우스 이벤트의 dwExtraInfo에
+# 서명(0xFF515700)이 실린다. 이를 읽어 '지금 포인터가 펜인지'를 계속 갱신한다.
+_WM_MOUSE = {0x0201, 0x0202, 0x0204, 0x0205, 0x0207, 0x0208, 0x020A, 0x0200}
+_PEN_SIG_MASK = 0xFFFFFF80
+_PEN_SIG = 0xFF515700
+
+
+class _MSLLHOOKSTRUCT(ctypes.Structure):
+    _fields_ = [("pt", _POINT), ("mouseData", ctypes.c_uint32),
+                ("flags", ctypes.c_uint32), ("time", ctypes.c_uint32),
+                ("dwExtraInfo", ctypes.c_size_t)]   # ULONG_PTR (펜 서명 값)
+
+
+class PenInputDetector:
+    """저수준 마우스 훅으로 현재 포인터가 태블릿 펜인지 추적."""
+
+    def __init__(self):
+        self.is_pen = False
+        self._hook = None
+        import threading
+        threading.Thread(target=self._run, daemon=True).start()
+
+    def _run(self):
+        HOOKPROC = ctypes.CFUNCTYPE(
+            ctypes.c_long, ctypes.c_int, ctypes.c_uint, ctypes.c_void_p)
+        user32 = ctypes.windll.user32
+
+        def proc(ncode, wparam, lparam):
+            if ncode >= 0 and wparam in _WM_MOUSE:
+                try:
+                    ms = ctypes.cast(lparam, ctypes.POINTER(_MSLLHOOKSTRUCT))[0]
+                    self.is_pen = (ms.dwExtraInfo & _PEN_SIG_MASK) == _PEN_SIG
+                except Exception:
+                    pass
+            return user32.CallNextHookEx(None, ncode, wparam, lparam)
+
+        self._cb = HOOKPROC(proc)     # 참조 유지 (GC 방지)
+        self._hook = user32.SetWindowsHookExW(14, self._cb, None, 0)  # WH_MOUSE_LL
+        import ctypes.wintypes as wt
+        msg = wt.MSG()
+        while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
+            user32.TranslateMessage(ctypes.byref(msg))
+            user32.DispatchMessageW(ctypes.byref(msg))
 
 
 ctypes.windll.user32.MonitorFromPoint.argtypes = [_POINT, ctypes.c_uint32]
@@ -537,6 +562,8 @@ class Mascot:
         self._pen_drawing_prev = False
         self.sound_packs = self._list_packs()
         self._init_sound()
+        # 태블릿 펜 입력 판별 (펜으로 그을 때만 펜 소리)
+        self.pen_input = PenInputDetector()
 
         # ── 전역 입력 리스너 ──────────────────────────────────────────────
         self._held = set()
@@ -1225,13 +1252,14 @@ class Mascot:
             c.create_image(px + ddx, py + ddy,
                            image=self.im["arm_pen"], anchor="nw")
             self._draw_left(now, f)
-            # 연필 사각거림: 선 긋기 시작 순간에만 1회, 떼면 즉시 정지
+            # 연필 사각거림: 태블릿 펜으로 그을 때만, 시작 순간 1회. 떼면 정지.
             if self.pensnd is not None and "pen" not in f:
-                if drawing and not self._pen_drawing_prev:
+                pen_draw = drawing and self.pen_input.is_pen
+                if pen_draw and not self._pen_drawing_prev:
                     self.pensnd.play_once()
-                elif not drawing:
+                elif not pen_draw:
                     self.pensnd.stop()
-                self._pen_drawing_prev = drawing
+                self._pen_drawing_prev = pen_draw
 
     def _draw_left(self, now, f):
         """왼손(키보드): 어깨 축 회전으로 키를 옮겨가며 타이핑."""
