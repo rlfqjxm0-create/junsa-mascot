@@ -1,5 +1,5 @@
 {
- "version": 1784441820,
+ "version": 1784442565,
  "files": {
   "mascot.py": "385e5c721bce821ba3faa7ee4be79da623696386cce093277f1e21c2598c8ce9",
   "parts_junsa/arm_key.png": "f31411e91c5897a8b8a3911d91d05ddb5d61842545ac0a88db39abc5a119485c",
@@ -7,7 +7,7 @@
   "parts_junsa/arm_right.png": "1027198c07e917cbcf16db0242280f8d337912091af937051878229785e72c2c",
   "parts_junsa/arm_right_typing.png": "d3da01f7573f7078ec82316e7b7c3bf7e1d99123bcf02b15bec14ac92eee13c0",
   "parts_junsa/body_open.png": "16f3d6e6d92e18a1d84177e0d4df94b2d9c31fc52bd8619a044d7cdaa1d732a8",
-  "parts_junsa/config.json": "e9f2ed0c38cec0c152b0e191970668b77ebd5b2dfbcfa810f519a3cbce4ae2d8",
+  "parts_junsa/config.json": "561e7478eb1ac45857602743d2d8051e87d374255f369f4f861a03cc66c9c23d",
   "parts_junsa/desk.png": "bb85529f6390542f3df3f584691bb42b9b8302f9f7b7ca5f10fd05cc9d5ce1b5",
   "parts_junsa/eyes_closed.png": "fd094c16062b4d1af4274220b785fc748195ebc406bffe2673e82d3978f09e15",
   "parts_junsa/hair.png": "3d23e3c2e207b1c5d71dfebf13514aad842faf1599c708244fb4ddaae931a3ba",
