@@ -835,35 +835,45 @@ class Mascot:
                              fill="#b9aed6", outline="")
             c.create_polygon(rx + 2, y0 + 3, rx + 14, y0 + 10, rx + 12, y0 + 2,
                              fill="#b9aed6", outline="")
+        elif cd["deco"] == "cat":
+            # 고양이 귀: 바깥쪽으로 살짝 기운 세모 + 안쪽 귓속
+            for sign, ex in ((-1, x0 + 26), (1, x1 - 26)):
+                c.create_polygon(ex - 13 * sign, y0 + 5, ex + 3 * sign, y0 - 17,
+                                 ex + 13 * sign, y0 + 3,
+                                 fill="#f5bdd2", outline="#d687ab", width=2)
+                c.create_polygon(ex - 6 * sign, y0 + 2, ex + 3 * sign, y0 - 10,
+                                 ex + 8 * sign, y0 + 1,
+                                 fill="#eba0c0", outline="")
         # 그림자 + 카드
         self._rrect(x0 + 2, y0 + 3, x1 + 2, y1 + 3, 16, fill="#e3e6ee", outline="")
         self._rrect(x0, y0, x1, y1, 16, fill=cd["bg"],
                     outline=cd["border"], width=2)
 
-        # 윗줄: 상태 점(작업중이면 콩닥콩닥) + 상태 + 시간
+        # 내부 여백을 좌우 14px로 통일하고, 윗줄 요소는 모두 시간의 세로 중앙에 정렬
+        pad = 14
         row1 = y0 + 20
         pulse = 1.5 + math.sin(now * 4) * 1.5 if active else 0
         r = 5 + pulse * 0.5
-        c.create_oval(x0 + 18 - r, row1 - r, x0 + 18 + r, row1 + r,
+        c.create_oval(x0 + pad + 5 - r, row1 - r, x0 + pad + 5 + r, row1 + r,
                       fill=dot, outline="")
-        c.create_text(x0 + 30, row1, anchor="w", text=status,
+        c.create_text(x0 + pad + 16, row1, anchor="w", text=status,
                       font=("Malgun Gothic", 8), fill=cd["sub"])
-        c.create_text(x1 - 16, row1, anchor="e", text=label,
+        c.create_text(x1 - pad, row1, anchor="e", text=label,
                       font=("Malgun Gothic", 13, "bold"), fill=cd["text"])
 
-        # 아랫줄: 목표 진행바 (숫자와 넉넉히 띄움)
+        # 아랫줄: 목표 진행바 + 퍼센트
         goal = max(float(self.us["goal_hours"]), 0.5) * 3600
         frac = min(self.work_secs / goal, 1.0)
         row2 = y0 + 45
-        bx0, bx1 = x0 + 16, x1 - 50
+        bx0, bx1 = x0 + pad + 2, x1 - pad - 36
         c.create_line(bx0, row2, bx1, row2, width=6, capstyle="round",
                       fill=cd["track"])
         if frac > 0.01:
             c.create_line(bx0, row2, bx0 + (bx1 - bx0) * frac, row2,
                           width=6, capstyle="round",
                           fill="#7ccf8f" if frac >= 1.0 else cd["fill"])
-        c.create_text(x1 - 16, row2, anchor="e", text=f"{int(frac * 100)}%",
-                      font=("Malgun Gothic", 8, "bold"),
+        c.create_text(x1 - pad, row2, anchor="e", text=f"{int(frac * 100)}%",
+                      font=("Malgun Gothic", 7, "bold"),
                       fill="#5aa86e" if frac >= 1.0 else cd["sub"])
 
     # ── 매 프레임 갱신 (~30fps) ──────────────────────────────────────────
