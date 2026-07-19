@@ -264,6 +264,7 @@ class SoundPack:
         h = ctypes.c_void_p()
         if wm.waveOutOpen(ctypes.byref(h), 0xFFFFFFFF, ctypes.byref(wfx), 0, 0, 0):
             return
+        wm.waveOutSetVolume(h, 0xFFFFFFFF)   # 앱/장치 볼륨 고정 해제 (실볼륨은 샘플로)
         hdr = _WAVEHDR()
         hdr.lpData = ctypes.cast(buf, ctypes.c_void_p)
         hdr.dwBufferLength = ln
@@ -353,6 +354,7 @@ class PenSound:
         h = ctypes.c_void_p()
         if wm.waveOutOpen(ctypes.byref(h), 0xFFFFFFFF, ctypes.byref(wfx), 0, 0, 0):
             return
+        wm.waveOutSetVolume(h, 0xFFFFFFFF)   # 앱/장치 볼륨 고정 해제 (실볼륨은 샘플로)
         hdr = _WAVEHDR()
         hdr.lpData = ctypes.cast(buf, ctypes.c_void_p)
         hdr.dwBufferLength = ln
