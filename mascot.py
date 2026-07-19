@@ -211,7 +211,7 @@ class SoundPack:
         for v in cfg.get("defines", {}).values():
             if isinstance(v, str) and v and v not in names:
                 names.append(v)
-        self.sounds = []          # (WAVEFORMATEX, 버퍼, 길이)
+        self.raw = []             # (WAVEFORMATEX, 원본PCM)
         for name in names:
             path = os.path.join(folder, name)
             if not (name.lower().endswith(".wav") and os.path.exists(path)):
@@ -220,22 +220,37 @@ class SoundPack:
                 ch, sw, fr = w.getnchannels(), w.getsampwidth(), w.getframerate()
                 data = w.readframes(w.getnframes())
             wfx = _WAVEFORMATEX(1, ch, fr, fr * ch * sw, ch * sw, sw * 8, 0)
-            buf = ctypes.create_string_buffer(data, len(data))
-            self.sounds.append((wfx, buf, len(data)))
-        if not self.sounds:
+            self.raw.append((wfx, data))
+        if not self.raw:
             raise ValueError("재생 가능한 wav가 없음")
-        self.volume = volume
         self._active = []         # (핸들, WAVEHDR) — 재생 끝나면 정리
         self._lock = threading.Lock()
+        self.set_volume(volume)
+
+    def set_volume(self, volume):
+        """볼륨(0~100)을 샘플에 곱해 재생용 버퍼 준비 (드라이버 볼륨 무시 대비)."""
+        self.volume = max(0.0, min(float(volume), 100.0))
+        gain = self.volume / 100.0
+        self.sounds = []          # (WAVEFORMATEX, 버퍼, 길이)
+        if gain <= 0.0:
+            return
+        for wfx, data in self.raw:
+            buf = ctypes.create_string_buffer(data, len(data))
+            if gain < 0.999:
+                n = len(data) // 2
+                arr = (ctypes.c_int16 * n).from_buffer(buf)
+                for i in range(n):
+                    arr[i] = int(arr[i] * gain)
+            self.sounds.append((wfx, buf, len(data)))
 
     def play(self, key):
+        if not self.sounds:
+            return
         wfx, buf, ln = self.sounds[hash(str(key)) % len(self.sounds)]
         wm = ctypes.windll.winmm
         h = ctypes.c_void_p()
         if wm.waveOutOpen(ctypes.byref(h), 0xFFFFFFFF, ctypes.byref(wfx), 0, 0, 0):
             return
-        v = max(0, min(int(self.volume * 0xFFFF / 100), 0xFFFF))
-        wm.waveOutSetVolume(h, v | (v << 16))
         hdr = _WAVEHDR()
         hdr.lpData = ctypes.cast(buf, ctypes.c_void_p)
         hdr.dwBufferLength = ln
@@ -283,11 +298,13 @@ class PenSound:
     """선을 긋기 시작할 때 스크리블 클립 하나를 랜덤 재생 (한 번 '슥').
 
     짧은 선이든 긴 선이든 스트로크마다 클립 하나. 지속음(bed) 없음.
+    볼륨은 waveOutSetVolume이 드라이버에 무시될 수 있어(장치별 볼륨 미지원)
+    샘플 값 자체에 곱해 확실히 적용한다. 0이면 아예 재생하지 않는다.
     """
 
     def __init__(self, folder, volume=35):
         import wave
-        self.clips = []           # (WAVEFORMATEX, 버퍼, 길이)
+        self.raw = []             # (WAVEFORMATEX, 원본PCM bytes)
         names = [f for f in sorted(os.listdir(folder)) if f.lower().endswith(".wav")]
         clips = [f for f in names if f.lower().startswith("clip")] or names
         for f in clips:
@@ -295,15 +312,32 @@ class PenSound:
                 ch, sw, fr = w.getnchannels(), w.getsampwidth(), w.getframerate()
                 data = w.readframes(w.getnframes())
             wfx = _WAVEFORMATEX(1, ch, fr, fr * ch * sw, ch * sw, sw * 8, 0)
-            self.clips.append((wfx, ctypes.create_string_buffer(data, len(data)),
-                               len(data)))
-        if not self.clips:
+            self.raw.append((wfx, data))
+        if not self.raw:
             raise ValueError("펜 소리 wav 없음")
-        self.volume = volume
+        self.set_volume(volume)
         self._cur = None          # (핸들, WAVEHDR, 버퍼)
 
+    def set_volume(self, volume):
+        """볼륨(0~100)을 샘플에 곱해 재생용 버퍼를 준비."""
+        self.volume = max(0.0, min(float(volume), 100.0))
+        gain = self.volume / 100.0
+        self.clips = []           # (WAVEFORMATEX, 버퍼, 길이)
+        if gain <= 0.0:
+            return                # 무음이면 버퍼 안 만듦 → play()가 그냥 반환
+        for wfx, data in self.raw:
+            buf = ctypes.create_string_buffer(data, len(data))
+            if gain < 0.999:
+                n = len(data) // 2
+                arr = (ctypes.c_int16 * n).from_buffer(buf)
+                for i in range(n):
+                    arr[i] = int(arr[i] * gain)
+            self.clips.append((wfx, buf, len(data)))
+
     def play(self):
-        """랜덤 클립 하나 재생 (선 긋기 시작 시)."""
+        """랜덤 클립 하나 재생 (선 긋기 시작 시). 볼륨 0이면 무음."""
+        if not self.clips:
+            return
         wm = ctypes.windll.winmm
         if self._cur is not None:
             self._release(self._cur)
@@ -312,8 +346,6 @@ class PenSound:
         h = ctypes.c_void_p()
         if wm.waveOutOpen(ctypes.byref(h), 0xFFFFFFFF, ctypes.byref(wfx), 0, 0, 0):
             return
-        v = max(0, min(int(self.volume * 0xFFFF / 100), 0xFFFF))
-        wm.waveOutSetVolume(h, v | (v << 16))
         hdr = _WAVEHDR()
         hdr.lpData = ctypes.cast(buf, ctypes.c_void_p)
         hdr.dwBufferLength = ln
