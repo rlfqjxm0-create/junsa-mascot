@@ -281,43 +281,54 @@ class SoundPack:
 
 
 class PenSound:
-    """선을 긋기 시작할 때 연필 클립 하나를 랜덤 재생. 펜을 떼면 즉시 끊는다.
+    """연속 연필 소리(penbed.wav)를 선을 긋는 동안만 흘려보낸다.
 
-    긴 루프를 소리 나는 구간별로 잘라 만든 클립들(cut_pen_sound.py)을 사용하므로
-    항상 실제 소리가 나고 움직임과 어긋나지 않는다.
+    start()에서 임의 지점부터 루프 재생을 시작하고 stop()에서 멈추므로,
+    소리 길이가 실제 선 길이와 일치한다(짧은 선=짧은 소리, 긴 선=긴 소리).
+    무음을 제거해 이어 붙인 베드라 루프해도 자연스럽다.
     """
+    _LOOP_FLAGS = 0x00000004 | 0x00000008     # WHDR_BEGINLOOP | WHDR_ENDLOOP
 
     def __init__(self, folder, volume=35):
         import wave
-        self.sounds = []          # (WAVEFORMATEX, 버퍼, 길이)
-        for f in sorted(os.listdir(folder)):
-            if not f.lower().endswith(".wav"):
-                continue
-            with wave.open(os.path.join(folder, f), "rb") as w:
-                ch, sw, fr = w.getnchannels(), w.getsampwidth(), w.getframerate()
-                data = w.readframes(w.getnframes())
-            wfx = _WAVEFORMATEX(1, ch, fr, fr * ch * sw, ch * sw, sw * 8, 0)
-            self.sounds.append((wfx, ctypes.create_string_buffer(data, len(data)),
-                                len(data)))
-        if not self.sounds:
-            raise ValueError("펜 소리 wav 없음")
+        path = os.path.join(folder, "penbed.wav")
+        if not os.path.exists(path):                 # 폴백: 아무 wav나
+            wavs = [f for f in os.listdir(folder) if f.lower().endswith(".wav")]
+            if not wavs:
+                raise ValueError("펜 소리 wav 없음")
+            path = os.path.join(folder, wavs[0])
+        with wave.open(path, "rb") as w:
+            self.ch, self.sw, self.fr = (w.getnchannels(), w.getsampwidth(),
+                                         w.getframerate())
+            self.pcm = w.readframes(w.getnframes())
+        self.fb = self.ch * self.sw
+        self.nframes = len(self.pcm) // self.fb
+        self.wfx = _WAVEFORMATEX(1, self.ch, self.fr, self.fr * self.fb,
+                                 self.fb, self.sw * 8, 0)
         self.volume = volume
         self._cur = None          # (핸들, WAVEHDR)
+        self._buf = None
 
-    def play_once(self):
-        """랜덤 클립 하나를 새로 재생 (선 긋기 시작 시 1회 호출)."""
+    def start(self):
+        """임의 지점부터 연속 재생 시작 (선 긋기 시작 시 1회)."""
         wm = ctypes.windll.winmm
         if self._cur is not None:
             self._release()
-        wfx, buf, ln = random.choice(self.sounds)
+        # 임의 시작점으로 회전한 버퍼 → 매번 다른 소리로 시작, 끝나면 처음으로 루프
+        off = random.randint(0, max(self.nframes - 1, 0)) * self.fb
+        data = self.pcm[off:] + self.pcm[:off]
+        self._buf = ctypes.create_string_buffer(data, len(data))
         h = ctypes.c_void_p()
-        if wm.waveOutOpen(ctypes.byref(h), 0xFFFFFFFF, ctypes.byref(wfx), 0, 0, 0):
+        if wm.waveOutOpen(ctypes.byref(h), 0xFFFFFFFF, ctypes.byref(self.wfx),
+                          0, 0, 0):
             return
         v = max(0, min(int(self.volume * 0xFFFF / 100), 0xFFFF))
         wm.waveOutSetVolume(h, v | (v << 16))
         hdr = _WAVEHDR()
-        hdr.lpData = ctypes.cast(buf, ctypes.c_void_p)
-        hdr.dwBufferLength = ln
+        hdr.lpData = ctypes.cast(self._buf, ctypes.c_void_p)
+        hdr.dwBufferLength = len(data)
+        hdr.dwFlags = self._LOOP_FLAGS
+        hdr.dwLoops = 0xFFFFFFF
         wm.waveOutPrepareHeader(h, ctypes.byref(hdr), ctypes.sizeof(_WAVEHDR))
         wm.waveOutWrite(h, ctypes.byref(hdr), ctypes.sizeof(_WAVEHDR))
         self._cur = (h, hdr)
@@ -329,7 +340,7 @@ class PenSound:
     def _release(self):
         wm = ctypes.windll.winmm
         h, hdr = self._cur
-        wm.waveOutReset(h)
+        wm.waveOutReset(h)        # 루프 중단 + 즉시 정지
         wm.waveOutUnprepareHeader(h, ctypes.byref(hdr), ctypes.sizeof(_WAVEHDR))
         wm.waveOutClose(h)
         self._cur = None
@@ -513,7 +524,8 @@ class Mascot:
         # ── 타자 소리 / 펜 소리 ──────────────────────────────────────────
         self.sndpack = None
         self.pensnd = None
-        self._pen_drawing_prev = False
+        self._pen_playing = False
+        self._pen_release_t = None
         self.sound_packs = self._list_packs()
         self._init_sound()
 
@@ -705,6 +717,8 @@ class Mascot:
             except Exception:
                 pass
             self.pensnd = None
+        self._pen_playing = False
+        self._pen_release_t = None
         if not (self.us.get("sound", True) and self.sound_packs):
             return
         name = str(self.us.get("sound_pack") or "")
@@ -1204,13 +1218,20 @@ class Mascot:
             c.create_image(px + ddx, py + ddy,
                            image=self.im["arm_pen"], anchor="nw")
             self._draw_left(now, f)
-            # 연필 사각거림: 선 긋기 시작 순간에만 1회, 떼면 즉시 정지
+            # 연필 사각거림: 긋는 동안 연속 재생, 떼면 정지 (짧은 끊김은 무시)
             if self.pensnd is not None and "pen" not in f:
-                if drawing and not self._pen_drawing_prev:
-                    self.pensnd.play_once()
-                elif not drawing:
-                    self.pensnd.stop()
-                self._pen_drawing_prev = drawing
+                if drawing:
+                    self._pen_release_t = None
+                    if not self._pen_playing:
+                        self.pensnd.start()
+                        self._pen_playing = True
+                elif self._pen_playing:
+                    # 펜압 흔들림으로 잠깐 떨어지는 것은 무시(70ms 유예)
+                    if self._pen_release_t is None:
+                        self._pen_release_t = now
+                    elif now - self._pen_release_t > 0.07:
+                        self.pensnd.stop()
+                        self._pen_playing = False
 
     def _draw_left(self, now, f):
         """왼손(키보드): 어깨 축 회전으로 키를 옮겨가며 타이핑."""
