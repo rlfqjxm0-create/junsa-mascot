@@ -280,96 +280,51 @@ class SoundPack:
 
 
 class PenSound:
-    """펜 소리 하이브리드 — 짧은 선은 클립 한 번, 길게 이어지면 지속음.
+    """선을 긋기 시작할 때 스크리블 클립 하나를 랜덤 재생 (한 번 '슥').
 
-    - start(): 옛 스크리블 클립(clip_*.wav) 하나를 한 번 재생 (한 번 '슥').
-    - sustain(): 선이 계속되면(>SUSTAIN_DELAY) 그래뉼러 지속음(penbed.wav)을
-      루프로 이어 붙여 '스으으윽'으로 지속.
-    - stop(): 둘 다 정지. → 선 길이와 소리 길이가 맞는다.
+    짧은 선이든 긴 선이든 스트로크마다 클립 하나. 지속음(bed) 없음.
     """
-    _LOOP_FLAGS = 0x00000004 | 0x00000008     # WHDR_BEGINLOOP | WHDR_ENDLOOP
-    SUSTAIN_DELAY = 0.35
 
     def __init__(self, folder, volume=35):
         import wave
-
-        def load(path):
-            with wave.open(path, "rb") as w:
+        self.clips = []           # (WAVEFORMATEX, 버퍼, 길이)
+        names = [f for f in sorted(os.listdir(folder)) if f.lower().endswith(".wav")]
+        clips = [f for f in names if f.lower().startswith("clip")] or names
+        for f in clips:
+            with wave.open(os.path.join(folder, f), "rb") as w:
                 ch, sw, fr = w.getnchannels(), w.getsampwidth(), w.getframerate()
                 data = w.readframes(w.getnframes())
             wfx = _WAVEFORMATEX(1, ch, fr, fr * ch * sw, ch * sw, sw * 8, 0)
-            return (wfx, ctypes.create_string_buffer(data, len(data)),
-                    len(data), ch * sw, fr)
-
-        self.clips = []
-        for f in sorted(os.listdir(folder)):
-            if f.lower().startswith("clip") and f.lower().endswith(".wav"):
-                wfx, buf, ln, _, _ = load(os.path.join(folder, f))
-                self.clips.append((wfx, buf, ln))
-        self.bed = None
-        bp = os.path.join(folder, "penbed.wav")
-        if os.path.exists(bp):
-            wfx, buf, ln, fb, fr = load(bp)
-            # 긴 지속음은 매번 임의 위치의 구간만 떼어 재생(전체 복사 회피)
-            self.bed = (wfx, buf.raw, fb, ln // fb, fr)
-        if not self.clips and self.bed is None:       # 폴백: 아무 wav나 클립으로
-            for f in sorted(os.listdir(folder)):
-                if f.lower().endswith(".wav"):
-                    wfx, buf, ln, _, _ = load(os.path.join(folder, f))
-                    self.clips.append((wfx, buf, ln))
-        if not self.clips and self.bed is None:
+            self.clips.append((wfx, ctypes.create_string_buffer(data, len(data)),
+                               len(data)))
+        if not self.clips:
             raise ValueError("펜 소리 wav 없음")
         self.volume = volume
-        self._clip = None         # (핸들, WAVEHDR, 버퍼)
-        self._beddev = None
-        self._t0 = 0.0
-        self._bed_on = False
+        self._cur = None          # (핸들, WAVEHDR, 버퍼)
 
-    def _open(self, wfx, buf, ln, loop):
+    def play(self):
+        """랜덤 클립 하나 재생 (선 긋기 시작 시)."""
         wm = ctypes.windll.winmm
+        if self._cur is not None:
+            self._release(self._cur)
+            self._cur = None
+        wfx, buf, ln = random.choice(self.clips)
         h = ctypes.c_void_p()
         if wm.waveOutOpen(ctypes.byref(h), 0xFFFFFFFF, ctypes.byref(wfx), 0, 0, 0):
-            return None
+            return
         v = max(0, min(int(self.volume * 0xFFFF / 100), 0xFFFF))
         wm.waveOutSetVolume(h, v | (v << 16))
         hdr = _WAVEHDR()
         hdr.lpData = ctypes.cast(buf, ctypes.c_void_p)
         hdr.dwBufferLength = ln
-        if loop:
-            hdr.dwFlags = self._LOOP_FLAGS
-            hdr.dwLoops = 0xFFFFFFF
         wm.waveOutPrepareHeader(h, ctypes.byref(hdr), ctypes.sizeof(_WAVEHDR))
         wm.waveOutWrite(h, ctypes.byref(hdr), ctypes.sizeof(_WAVEHDR))
-        return (h, hdr, buf)
-
-    def start(self):
-        """선 긋기 시작 — 클립 하나를 한 번 재생."""
-        self.stop()
-        if self.clips:
-            self._clip = self._open(*random.choice(self.clips), loop=False)
-        self._t0 = time.time()
-        self._bed_on = False
-
-    def sustain(self, now):
-        """선이 계속되면 지속음 베드를 이어 붙인다 (한 번만)."""
-        if self.bed is None or self._bed_on or now - self._t0 < self.SUSTAIN_DELAY:
-            return
-        wfx, pcm, fb, nframes, fr = self.bed
-        # 긴 파일에서 임의 위치의 12초 구간만 떼어 루프 (전체 15MB 복사 회피)
-        seg = min(int(12.0 * fr), nframes)
-        start = random.randint(0, max(nframes - seg, 0))
-        data = pcm[start * fb:(start + seg) * fb]
-        buf = ctypes.create_string_buffer(data, len(data))
-        self._beddev = self._open(wfx, buf, len(data), loop=True)
-        self._bed_on = True
+        self._cur = (h, hdr, buf)
 
     def stop(self):
-        for d in (self._clip, self._beddev):
-            if d is not None:
-                self._release(d)
-        self._clip = None
-        self._beddev = None
-        self._bed_on = False
+        if self._cur is not None:
+            self._release(self._cur)
+            self._cur = None
 
     @staticmethod
     def _release(dev):
@@ -1264,21 +1219,18 @@ class Mascot:
             c.create_image(px + ddx, py + ddy,
                            image=self.im["arm_pen"], anchor="nw")
             self._draw_left(now, f)
-            # 연필 사각거림: 시작=클립 한 번, 길게 이어지면=지속음, 떼면 정지
+            # 연필 사각거림: 스트로크마다 클립 한 번 (짧은/긴 선 동일)
             if self.pensnd is not None and "pen" not in f:
                 if drawing:
                     self._pen_release_t = None
                     if not self._pen_playing:
-                        self.pensnd.start()
+                        self.pensnd.play()
                         self._pen_playing = True
-                    else:
-                        self.pensnd.sustain(now)
                 elif self._pen_playing:
                     # 펜압 흔들림으로 잠깐 떨어지는 것은 무시(70ms 유예)
                     if self._pen_release_t is None:
                         self._pen_release_t = now
                     elif now - self._pen_release_t > 0.07:
-                        self.pensnd.stop()
                         self._pen_playing = False
 
     def _draw_left(self, now, f):
