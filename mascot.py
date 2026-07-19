@@ -612,7 +612,9 @@ class Mascot:
         pil_cache = {}
         for name in ("body_open", "pupils", "body_mask", "lashes", "hair",
                      "eyes_closed", "head", "desk", "arm_pen"):
-            self.has[name] = os.path.exists(os.path.join(self.dir, f"{name}.png"))
+            # 파일과 layout 위치가 둘 다 있어야 사용 (자동업데이트 섞임 대비)
+            self.has[name] = (os.path.exists(os.path.join(self.dir, f"{name}.png"))
+                              and name in self.layout)
             if self.has[name]:
                 pil_cache[name] = load_pil(name)
                 self.im[name] = ImageTk.PhotoImage(pil_cache[name])
