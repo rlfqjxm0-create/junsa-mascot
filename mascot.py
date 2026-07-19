@@ -49,7 +49,9 @@ TRANSPARENT = "#010203"          # 투명 키 색
 
 KEY_ROT = (-7.0, 7.0)            # 타이핑 시 손 회전(어깨 축) 범위 (도)
 PEN_KB_ROT = (-6.0, 6.0)
-TIMER_H = 92                     # 타이머 카드 영역 높이
+TIMER_H = 92                     # 타이머 카드 영역 높이 (게이지형 = 준사)
+OY_CLOCK_COMPACT = 70            # 시계형 카드 접힘 (상태+시간 한 줄)
+OY_CLOCK_OPEN = 190             # 시계형 카드 펼침 (시계 + 시간)
 
 # 타이머 카드 팔레트 (준사 배색)
 CARD_BORDER = "#f2b8c6"          # 소프트 핑크
@@ -71,6 +73,7 @@ DEFAULT_SETTINGS = {
     "work_apps": "clipstudiopaint.exe, photoshop.exe, sai2.exe, krita.exe",
     "sleep_min": 10,      # 이 시간(분) 동안 무입력이면 수면 모드
     "shadow": True,       # 캐릭터 뒤 옅은 그림자
+    "clock_open": False,  # 시계형 카드에서 시계 펼침 상태
     "sound": True,        # 타자 소리 (Mechvibes 팩)
     "sound_volume": 60,   # 소리 볼륨 (0~100)
     "sound_pack": "banana split lubed",
@@ -161,6 +164,10 @@ class ShadowLayer:
         g.DeleteObject(hbm)
         g.DeleteDC(mem)
         u.ReleaseDC(0, hdc)
+
+    def set_image(self, image):
+        """그림자 이미지 교체 (시계 토글로 크기가 바뀔 때)."""
+        self._push(image)
 
     def place(self, x, y, owner_hwnd):
         """본체 창 바로 아래 z순서로, 오프셋만큼 밀린 위치에 배치."""
@@ -407,7 +414,6 @@ class Mascot:
         self.timer_on = bool(tcfg.get("enabled")) \
             if self.us["show_timer"] is None else bool(self.us["show_timer"])
         self.idle_thr = float(self.us["idle_sec"])
-        self.oy = TIMER_H if self.timer_on else 0   # 캐릭터 전체 y 오프셋
         self._settings_win = None
 
         # 타이머 카드 테마 (캐릭터별 config의 card 섹션)
@@ -420,13 +426,18 @@ class Mascot:
         }
 
         # 워크스페이스 워크타이머 연동 (config의 workspace_timer = 라이브 파일 경로)
+        # 연동 모드 = 게이지 대신 시계 토글 카드. 비연동(준사) = 목표 게이지 카드.
         ws = self.cfg.get("workspace_timer")
         self.ws_path = os.path.normpath(os.path.join(HERE, ws)) if ws else None
         self._ws_data = None
         self._ws_read = 0.0
+        self.has_clock = self.timer_on and self.ws_path is not None
+        self.clock_open = bool(self.us.get("clock_open")) if self.has_clock else False
 
+        self.oy = self._timer_oy()                  # 캐릭터 전체 y 오프셋
         cw, ch = self.layout["canvas"]
-        self.W, self.H = round(cw * s), round(ch * s) + self.oy
+        self.cw_px, self.ch_px = round(cw * s), round(ch * s)
+        self.W, self.H = self.cw_px, self.ch_px + self.oy
 
         self.root = tk.Tk()
         self.root.overrideredirect(True)
@@ -473,12 +484,16 @@ class Mascot:
         if self.timer_on and self.ws_path is None:
             self._timer_load()
 
-        # ── 창 드래그 이동 / 우클릭 메뉴 ─────────────────────────────────
-        self._drag_off = (0, 0)
-        self.canvas.bind("<Button-1>", lambda e: setattr(self, "_drag_off", (e.x, e.y)))
-        self.canvas.bind("<B1-Motion>", self._drag_move)
+        # ── 창 드래그 이동 / 카드 클릭 토글 / 우클릭 메뉴 ────────────────
+        self._press = None
+        self._dragged = False
+        self.canvas.bind("<Button-1>", self._on_press)
+        self.canvas.bind("<B1-Motion>", self._on_drag)
+        self.canvas.bind("<ButtonRelease-1>", self._on_release)
         menu = tk.Menu(self.root, tearoff=0)
         menu.add_command(label="환경설정", command=self.open_settings)
+        if self.has_clock:
+            menu.add_command(label="시계 펼치기 / 접기", command=self._toggle_clock)
         if self.timer_on and self.ws_path is None:
             menu.add_command(label="타이머 초기화", command=self._timer_reset)
         if self.ws_path is not None:
@@ -565,6 +580,27 @@ class Mascot:
 
         # 오른팔: 늘리기용
         self.arm_pil = load_pil("arm_right")
+        self._arm_cache = {}
+        # 왼손 위치 미세 보정 (캔버스 px, config의 arm_key_offset)
+        ko = self.cfg.get("arm_key_offset", [0, 0])
+        self.arm_key_off = (ko[0] * s, ko[1] * s)
+        self._pil_cache = {n: pil_cache[n] for n in pil_cache}
+        self._load_pil = load_pil
+
+        self._bake_oy()                 # oy 의존 좌표 계산
+        self._build_shadow_img()        # 그림자 이미지 생성
+
+    def _timer_oy(self):
+        """타이머 카드가 차지하는 캐릭터 위 여백."""
+        if not self.timer_on:
+            return 0
+        if self.has_clock:
+            return OY_CLOCK_OPEN if self.clock_open else OY_CLOCK_COMPACT
+        return TIMER_H
+
+    def _bake_oy(self):
+        """oy(카드 높이)에 의존하는 좌표들 — 시계 토글로 oy가 바뀌면 다시 부른다."""
+        s = self.s
         ar = self.layout["arm_right"]
         ax, ay = ar["pos"]
         self.arm_top = ((ax + ar["top"][0]) * s, (ay + ar["top"][1]) * s + self.oy)
@@ -572,50 +608,9 @@ class Mascot:
                            (ay + ar["bottom"][1]) * s + self.oy)
         self._arm_nat = (self.arm_bottom[0] - self.arm_top[0],
                          self.arm_bottom[1] - self.arm_top[1])
-        self._arm_cache = {}
-
         px, py = self.layout["arm_pen"]["pos"]
         tx, ty = self.cfg.get("pen_tip", self.layout["arm_pen"]["pen_tip"])
         self.pen_base_tip = ((px + tx) * s, (py + ty) * s + self.oy)
-
-        # 왼손 위치 미세 보정 (캔버스 px, config의 arm_key_offset)
-        ko = self.cfg.get("arm_key_offset", [0, 0])
-        self.arm_key_off = (ko[0] * s, ko[1] * s)
-
-        # 옅은 그림자: 기본 포즈 실루엣을 흐려 만든 반투명 이미지
-        # (별도 레이어 창에 표시 — 색상키 투명창에서는 반투명이 안 되므로)
-        self.shadow_img = None
-        if self.us.get("shadow", True):
-            from PIL import ImageFilter
-            comp = Image.new("RGBA", (self.W, self.H), (0, 0, 0, 0))
-            for name in ("body_open", "lashes", "hair", "desk", "arm_pen"):
-                if name in pil_cache:
-                    x, y = self._pos(name)
-                    comp.alpha_composite(pil_cache[name], (round(x), round(y)))
-            for name in ("arm_right", "arm_key"):
-                im = load_pil(name)
-                x, y = self._pos(name)
-                if name == "arm_key":
-                    x += self.arm_key_off[0]
-                    y += self.arm_key_off[1]
-                comp.alpha_composite(im, (round(x), round(y)))
-            if self.timer_on:
-                # 타이머 카드(+판다 귀)도 그림자에 포함
-                from PIL import ImageDraw
-                d = ImageDraw.Draw(comp)
-                cw, chh = 200, 62
-                cx0, cy0 = (self.W - cw) / 2, 22
-                cx1, cy1 = cx0 + cw, cy0 + chh
-                for ex in (cx0 + 26, cx1 - 26):
-                    d.ellipse([ex - 12, cy0 - 17, ex + 12, cy0 + 7],
-                              fill=(0, 0, 0, 255))
-                d.rounded_rectangle([cx0, cy0, cx1, cy1], radius=16,
-                                    fill=(0, 0, 0, 255))
-            a = comp.getchannel("A").filter(ImageFilter.GaussianBlur(7))
-            a = a.point(lambda v: int(v * 0.30))   # 최대 ~30% 진하기
-            self.shadow_img = Image.merge(
-                "RGBA", (*Image.new("RGB", (self.W, self.H), (0, 0, 0)).split(), a))
-
         self.quad = [(x * s, y * s + self.oy) for x, y in self.cfg["screen_quad"]]
         blink = self.cfg.get("blink")
         self.blink_cfg = None
@@ -623,6 +618,48 @@ class Mascot:
             r = blink["rect"]
             self.blink_cfg = ([r[0] * s, r[1] * s + self.oy,
                                r[2] * s, r[3] * s + self.oy], blink["color"])
+
+    def _build_shadow_img(self):
+        """캐릭터+카드 실루엣을 흐려 만든 반투명 그림자 이미지."""
+        self.shadow_img = None
+        if not self.us.get("shadow", True):
+            return
+        from PIL import ImageDraw, ImageFilter
+        comp = Image.new("RGBA", (self.W, self.H), (0, 0, 0, 0))
+        for name in ("body_open", "lashes", "hair", "desk", "arm_pen"):
+            if name in self._pil_cache:
+                x, y = self._pos(name)
+                comp.alpha_composite(self._pil_cache[name], (round(x), round(y)))
+        for name in ("arm_right", "arm_key"):
+            im = self._load_pil(name)
+            x, y = self._pos(name)
+            if name == "arm_key":
+                x += self.arm_key_off[0]
+                y += self.arm_key_off[1]
+            comp.alpha_composite(im, (round(x), round(y)))
+        if self.timer_on:
+            d = ImageDraw.Draw(comp)
+            cg = self._card_geom()
+            cx0, cy0, cx1, cy1 = cg["x0"], cg["y0"], cg["x1"], cg["y1"]
+            for ex in (cx0 + 26, cx1 - 26):        # 귀 실루엣
+                d.ellipse([ex - 12, cy0 - 17, ex + 12, cy0 + 7], fill=(0, 0, 0, 255))
+            d.rounded_rectangle([cx0, cy0, cx1, cy1], radius=16, fill=(0, 0, 0, 255))
+        a = comp.getchannel("A").filter(ImageFilter.GaussianBlur(7))
+        a = a.point(lambda v: int(v * 0.30))
+        self.shadow_img = Image.merge(
+            "RGBA", (*Image.new("RGB", (self.W, self.H), (0, 0, 0)).split(), a))
+
+    def _card_geom(self):
+        """현재 타이머 카드의 위치·크기. 시계 펼침이면 세로 직사각형."""
+        if self.has_clock and self.clock_open:
+            w, h = 148, 158           # 세로가 살짝 더 긴 직사각형
+        elif self.has_clock:
+            w, h = 196, 40
+        else:
+            w, h = 200, 62
+        x0 = (self.W - w) / 2
+        y0 = 22
+        return {"x0": x0, "y0": y0, "x1": x0 + w, "y1": y0 + h, "w": w, "h": h}
 
     def _resample(self):
         return Image.NEAREST if self.cfg.get("hard_alpha") else Image.BICUBIC
@@ -707,9 +744,44 @@ class Mascot:
         if self.mouse_pressed:
             self.last_drag = now
 
-    def _drag_move(self, e):
-        self.root.geometry(
-            f"+{e.x_root - self._drag_off[0]}+{e.y_root - self._drag_off[1]}")
+    def _on_press(self, e):
+        self._press = (e.x, e.y, e.x_root, e.y_root)
+        self._dragged = False
+
+    def _on_drag(self, e):
+        if self._press is None:
+            return
+        px, py, prx, pry = self._press
+        if not self._dragged and abs(e.x_root - prx) + abs(e.y_root - pry) < 4:
+            return
+        self._dragged = True
+        self.root.geometry(f"+{e.x_root - px}+{e.y_root - py}")
+
+    def _on_release(self, e):
+        if self._press is not None and not self._dragged and self.has_clock:
+            px, py, _, _ = self._press
+            g = self._card_geom()
+            if g["x0"] <= px <= g["x1"] and g["y0"] - 17 <= py <= g["y1"]:
+                self._toggle_clock()
+        self._press = None
+
+    def _toggle_clock(self):
+        """시계 펼침/접힘 — 창 높이를 바꾸고(아래 고정) 좌표·그림자 재계산."""
+        self.clock_open = not self.clock_open
+        self.us["clock_open"] = self.clock_open
+        self._save_settings()
+        old_oy, old_H = self.oy, self.H
+        old_x, old_y = self.root.winfo_x(), self.root.winfo_y()
+        self.oy = self._timer_oy()
+        self.H = self.ch_px + self.oy
+        d = self.oy - old_oy
+        self.canvas.config(height=self.H)
+        self.root.geometry(f"{self.W}x{self.H}+{old_x}+{old_y - (self.H - old_H)}")
+        self._pen_xy[1] += d                 # 좌표계가 d만큼 내려가므로 펜도 이동
+        self._bake_oy()
+        self._build_shadow_img()
+        if self.shadow is not None and self.shadow_img is not None:
+            self.shadow.set_image(self.shadow_img)
 
     def close(self):
         try:
@@ -791,51 +863,17 @@ class Mascot:
                x1 - r, y1, x0 + r, y1, x0, y1, x0, y1 - r, x0, y0 + r, x0, y0]
         return self.canvas.create_polygon(pts, smooth=True, **kw)
 
-    def _draw_timer(self, state, sleeping, now):
+    def _draw_deco(self, x0, y0, x1, y1):
+        """카드 위 장식(귀 등) — 캐릭터 컨셉별."""
         c = self.canvas
-        cd = self.card
-        active = state == "work"
-        if state == "off":
-            dot, status = DOT_OFF, "타이머 꺼짐"
-        elif sleeping:
-            dot, status = DOT_OFF, "자는 중"
-        elif state == "work":
-            dot, status = DOT_ON, "작업중"
-        elif state == "other":
-            dot, status = DOT_OTHER, "딴짓 중"
-        else:
-            dot, status = DOT_OFF, "쉬는 중"
-        t = int(self.work_secs)
-        label = f"{t // 3600}:{t % 3600 // 60:02d}:{t % 60:02d}"
-        w, h = 200, 62
-        x0, y0 = (self.W - w) / 2, 22
-        x1, y1 = x0 + w, y0 + h
-
-        # 카드 위 장식 — 캐릭터 컨셉에 맞게
-        if cd["deco"] == "panda":
+        deco = self.card["deco"]
+        if deco == "panda":
             for ex in (x0 + 26, x1 - 26):
                 c.create_oval(ex - 12, y0 - 17, ex + 12, y0 + 7,
                               fill="#2b2b2b", outline="")
                 c.create_oval(ex - 6, y0 - 11, ex + 6, y0 + 1,
                               fill="#4a4a4a", outline="")
-        elif cd["deco"] == "rose":
-            # 장미 헤어번 모티프: 소용돌이 든 분홍 원 + 리본
-            for i, ex in enumerate((x0 + 26, x1 - 26)):
-                c.create_oval(ex - 12, y0 - 17, ex + 12, y0 + 7,
-                              fill="#f5bdd2", outline="#d687ab", width=2)
-                c.create_arc(ex - 8, y0 - 13, ex + 8, y0 + 3,
-                             start=300, extent=270, style="arc",
-                             outline="#d687ab", width=2)
-                c.create_arc(ex - 4, y0 - 9, ex + 4, y0 - 1,
-                             start=120, extent=230, style="arc",
-                             outline="#d687ab", width=2)
-            rx = x1 - 26
-            c.create_polygon(rx - 2, y0 + 3, rx - 14, y0 + 10, rx - 12, y0 + 2,
-                             fill="#b9aed6", outline="")
-            c.create_polygon(rx + 2, y0 + 3, rx + 14, y0 + 10, rx + 12, y0 + 2,
-                             fill="#b9aed6", outline="")
-        elif cd["deco"] == "cat":
-            # 고양이 귀: 바깥쪽으로 살짝 기운 세모 + 안쪽 귓속
+        elif deco == "cat":
             for sign, ex in ((-1, x0 + 26), (1, x1 - 26)):
                 c.create_polygon(ex - 13 * sign, y0 + 5, ex + 3 * sign, y0 - 17,
                                  ex + 13 * sign, y0 + 3,
@@ -843,37 +881,119 @@ class Mascot:
                 c.create_polygon(ex - 6 * sign, y0 + 2, ex + 3 * sign, y0 - 10,
                                  ex + 8 * sign, y0 + 1,
                                  fill="#eba0c0", outline="")
-        # 그림자 + 카드
-        self._rrect(x0 + 2, y0 + 3, x1 + 2, y1 + 3, 16, fill="#e3e6ee", outline="")
-        self._rrect(x0, y0, x1, y1, 16, fill=cd["bg"],
-                    outline=cd["border"], width=2)
+        elif deco == "rose":
+            for ex in (x0 + 26, x1 - 26):
+                c.create_oval(ex - 12, y0 - 17, ex + 12, y0 + 7,
+                              fill="#f5bdd2", outline="#d687ab", width=2)
+                c.create_arc(ex - 8, y0 - 13, ex + 8, y0 + 3, start=300,
+                             extent=270, style="arc", outline="#d687ab", width=2)
 
-        # 내부 여백을 좌우 14px로 통일하고, 윗줄 요소는 모두 시간의 세로 중앙에 정렬
+    def _status_of(self, state, sleeping):
+        if state == "off":
+            return DOT_OFF, "타이머 꺼짐"
+        if sleeping:
+            return DOT_OFF, "자는 중"
+        if state == "work":
+            return DOT_ON, "작업중"
+        if state == "other":
+            return DOT_OTHER, "딴짓 중"
+        return DOT_OFF, "쉬는 중"
+
+    def _draw_clock(self, cx, cy, R, now):
+        """아날로그 시계 + 최근 12시간 작업 아크 (도로롱 파레트)."""
+        c = self.canvas
+        cd = self.card
+        c.create_oval(cx - R, cy - R, cx + R, cy + R,
+                      fill=cd["bg"], outline=cd["border"], width=2)
+        for i in range(12):
+            a = math.radians(i * 30 - 90)
+            big = i % 3 == 0
+            r2 = R - (8 if big else 5)
+            c.create_line(cx + (R - 3) * math.cos(a), cy + (R - 3) * math.sin(a),
+                          cx + r2 * math.cos(a), cy + r2 * math.sin(a),
+                          fill=cd["sub"], width=2 if big else 1)
+        # 작업 아크: 오전=바깥 링, 오후=안쪽 링 (12시간제 겹침 구분)
+        act = (self._ws_data or {}).get("act") or []
+        r_am, r_pm = R - 2, R - 6
+        for m in act:
+            lt = time.localtime(m * 60)
+            ang = math.radians(((lt.tm_hour % 12) * 60 + lt.tm_min) / 720 * 360 - 90)
+            rr = r_am if lt.tm_hour < 12 else r_pm
+            dx, dy = rr * math.cos(ang), rr * math.sin(ang)
+            c.create_oval(cx + dx - 1.4, cy + dy - 1.4, cx + dx + 1.4, cy + dy + 1.4,
+                          fill=cd["fill"], outline="")
+        lt = time.localtime(now)
+        hh = lt.tm_hour % 12 + lt.tm_min / 60
+        mm = lt.tm_min + lt.tm_sec / 60
+
+        def hand(frac, length, width, color):
+            a = math.radians(frac * 360 - 90)
+            c.create_line(cx, cy, cx + length * math.cos(a), cy + length * math.sin(a),
+                          width=width, fill=color, capstyle="round")
+
+        hand(hh / 12, R * 0.46, 3, cd["text"])
+        hand(mm / 60, R * 0.66, 2, cd["text"])
+        hand(lt.tm_sec / 60, R * 0.76, 1, cd["fill"])
+        c.create_oval(cx - 2.5, cy - 2.5, cx + 2.5, cy + 2.5, fill=cd["fill"], outline="")
+
+    def _draw_timer(self, state, sleeping, now):
+        c = self.canvas
+        cd = self.card
+        active = state == "work"
+        dot, status = self._status_of(state, sleeping)
+        t = int(self.work_secs)
+        label = f"{t // 3600}:{t % 3600 // 60:02d}:{t % 60:02d}"
+        g = self._card_geom()
+        x0, y0, x1, y1 = g["x0"], g["y0"], g["x1"], g["y1"]
         pad = 14
-        row1 = y0 + 20
-        pulse = 1.5 + math.sin(now * 4) * 1.5 if active else 0
-        r = 5 + pulse * 0.5
-        c.create_oval(x0 + pad + 5 - r, row1 - r, x0 + pad + 5 + r, row1 + r,
-                      fill=dot, outline="")
-        c.create_text(x0 + pad + 16, row1, anchor="w", text=status,
-                      font=("Malgun Gothic", 8), fill=cd["sub"])
-        c.create_text(x1 - pad, row1, anchor="e", text=label,
-                      font=("Malgun Gothic", 13, "bold"), fill=cd["text"])
 
-        # 아랫줄: 목표 진행바 + 퍼센트
-        goal = max(float(self.us["goal_hours"]), 0.5) * 3600
-        frac = min(self.work_secs / goal, 1.0)
-        row2 = y0 + 45
-        bx0, bx1 = x0 + pad + 2, x1 - pad - 36
-        c.create_line(bx0, row2, bx1, row2, width=6, capstyle="round",
-                      fill=cd["track"])
-        if frac > 0.01:
-            c.create_line(bx0, row2, bx0 + (bx1 - bx0) * frac, row2,
-                          width=6, capstyle="round",
-                          fill="#7ccf8f" if frac >= 1.0 else cd["fill"])
-        c.create_text(x1 - pad, row2, anchor="e", text=f"{int(frac * 100)}%",
-                      font=("Malgun Gothic", 7, "bold"),
-                      fill="#5aa86e" if frac >= 1.0 else cd["sub"])
+        self._draw_deco(x0, y0, x1, y1)
+        self._rrect(x0 + 2, y0 + 3, x1 + 2, y1 + 3, 16, fill="#e3e6ee", outline="")
+        self._rrect(x0, y0, x1, y1, 16, fill=cd["bg"], outline=cd["border"], width=2)
+
+        def status_dot(px, py):
+            pulse = 1.5 + math.sin(now * 4) * 1.5 if active else 0
+            r = 5 + pulse * 0.5
+            c.create_oval(px - r, py - r, px + r, py + r, fill=dot, outline="")
+
+        if self.has_clock and self.clock_open:
+            # 세로 카드: 상태(위) → 시계(가운데) → 시간(아래)
+            status_dot(x0 + pad + 5, y0 + 15)
+            c.create_text(x0 + pad + 16, y0 + 15, anchor="w", text=status,
+                          font=("Malgun Gothic", 8), fill=cd["sub"])
+            R = 38
+            self._draw_clock((x0 + x1) / 2, y0 + 32 + R, R, now)
+            c.create_text((x0 + x1) / 2, y1 - 15, text=label,
+                          font=("Malgun Gothic", 14, "bold"), fill=cd["text"])
+        elif self.has_clock:
+            # 접힘: 상태 + 시간 한 줄 (게이지 없음)
+            row = y0 + 20
+            status_dot(x0 + pad + 5, row)
+            c.create_text(x0 + pad + 16, row, anchor="w", text=status,
+                          font=("Malgun Gothic", 8), fill=cd["sub"])
+            c.create_text(x1 - pad, row, anchor="e", text=label,
+                          font=("Malgun Gothic", 13, "bold"), fill=cd["text"])
+        else:
+            # 게이지형(준사): 상태+시간 윗줄 + 목표 진행바 아랫줄
+            row1 = y0 + 20
+            status_dot(x0 + pad + 5, row1)
+            c.create_text(x0 + pad + 16, row1, anchor="w", text=status,
+                          font=("Malgun Gothic", 8), fill=cd["sub"])
+            c.create_text(x1 - pad, row1, anchor="e", text=label,
+                          font=("Malgun Gothic", 13, "bold"), fill=cd["text"])
+            goal = max(float(self.us["goal_hours"]), 0.5) * 3600
+            frac = min(self.work_secs / goal, 1.0)
+            row2 = y0 + 45
+            bx0, bx1 = x0 + pad + 2, x1 - pad - 36
+            c.create_line(bx0, row2, bx1, row2, width=6, capstyle="round",
+                          fill=cd["track"])
+            if frac > 0.01:
+                c.create_line(bx0, row2, bx0 + (bx1 - bx0) * frac, row2,
+                              width=6, capstyle="round",
+                              fill="#7ccf8f" if frac >= 1.0 else cd["fill"])
+            c.create_text(x1 - pad, row2, anchor="e", text=f"{int(frac * 100)}%",
+                          font=("Malgun Gothic", 7, "bold"),
+                          fill="#5aa86e" if frac >= 1.0 else cd["sub"])
 
     # ── 매 프레임 갱신 (~30fps) ──────────────────────────────────────────
     def tick(self):
@@ -1185,11 +1305,7 @@ class Mascot:
                             or new["show_timer"] != self.timer_on
                             or new["shadow"] != bool(self.us.get("shadow", True)))
             self.us.update(new)
-            try:
-                with open(self.settings_path, "w", encoding="utf-8") as fp:
-                    json.dump(self.us, fp, ensure_ascii=False, indent=1)
-            except Exception:
-                pass
+            self._save_settings()
             # 즉시 반영 가능한 항목
             self.idle_thr = self.us["idle_sec"]
             self.root.attributes("-topmost", bool(self.us["topmost"]))
@@ -1202,6 +1318,13 @@ class Mascot:
                   bg=CARD_BORDER, fg="#5b3a44", relief="flat",
                   font=("Malgun Gothic", 9, "bold")).grid(
             row=17, column=0, columnspan=2, pady=(6, 0))
+
+    def _save_settings(self):
+        try:
+            with open(self.settings_path, "w", encoding="utf-8") as fp:
+                json.dump(self.us, fp, ensure_ascii=False, indent=1)
+        except Exception:
+            pass
 
     def _restart(self):
         import subprocess
