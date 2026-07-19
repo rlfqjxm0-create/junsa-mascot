@@ -299,22 +299,24 @@ class PenSound:
                 ch, sw, fr = w.getnchannels(), w.getsampwidth(), w.getframerate()
                 data = w.readframes(w.getnframes())
             wfx = _WAVEFORMATEX(1, ch, fr, fr * ch * sw, ch * sw, sw * 8, 0)
-            return wfx, ctypes.create_string_buffer(data, len(data)), len(data), ch * sw
+            return (wfx, ctypes.create_string_buffer(data, len(data)),
+                    len(data), ch * sw, fr)
 
         self.clips = []
         for f in sorted(os.listdir(folder)):
             if f.lower().startswith("clip") and f.lower().endswith(".wav"):
-                wfx, buf, ln, _ = load(os.path.join(folder, f))
+                wfx, buf, ln, _, _ = load(os.path.join(folder, f))
                 self.clips.append((wfx, buf, ln))
         self.bed = None
         bp = os.path.join(folder, "penbed.wav")
         if os.path.exists(bp):
-            wfx, buf, ln, fb = load(bp)
-            self.bed = (wfx, buf.raw, fb, ln // fb)   # raw PCM으로 보관(회전용)
+            wfx, buf, ln, fb, fr = load(bp)
+            # 긴 지속음은 매번 임의 위치의 구간만 떼어 재생(전체 복사 회피)
+            self.bed = (wfx, buf.raw, fb, ln // fb, fr)
         if not self.clips and self.bed is None:       # 폴백: 아무 wav나 클립으로
             for f in sorted(os.listdir(folder)):
                 if f.lower().endswith(".wav"):
-                    wfx, buf, ln, _ = load(os.path.join(folder, f))
+                    wfx, buf, ln, _, _ = load(os.path.join(folder, f))
                     self.clips.append((wfx, buf, ln))
         if not self.clips and self.bed is None:
             raise ValueError("펜 소리 wav 없음")
@@ -353,9 +355,11 @@ class PenSound:
         """선이 계속되면 지속음 베드를 이어 붙인다 (한 번만)."""
         if self.bed is None or self._bed_on or now - self._t0 < self.SUSTAIN_DELAY:
             return
-        wfx, pcm, fb, nframes = self.bed
-        off = random.randint(0, max(nframes - 1, 0)) * fb
-        data = pcm[off:] + pcm[:off]                  # 임의 지점부터 루프
+        wfx, pcm, fb, nframes, fr = self.bed
+        # 긴 파일에서 임의 위치의 12초 구간만 떼어 루프 (전체 15MB 복사 회피)
+        seg = min(int(12.0 * fr), nframes)
+        start = random.randint(0, max(nframes - seg, 0))
+        data = pcm[start * fb:(start + seg) * fb]
         buf = ctypes.create_string_buffer(data, len(data))
         self._beddev = self._open(wfx, buf, len(data), loop=True)
         self._bed_on = True
