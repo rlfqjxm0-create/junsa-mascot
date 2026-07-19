@@ -49,6 +49,7 @@ TRANSPARENT = "#010203"          # 투명 키 색
 
 KEY_ROT = (-7.0, 7.0)            # 타이핑 시 손 회전(어깨 축) 범위 (도)
 PEN_KB_ROT = (-6.0, 6.0)
+SHADOW_PAD = 16                  # 그림자 이미지 여백 (가장자리 파츠 잘림 방지)
 TIMER_H = 92                     # 타이머 카드 영역 높이 (게이지형 = 준사)
 OY_CLOCK_COMPACT = 70            # 시계형 카드 접힘 (상태+시간 한 줄)
 OY_CLOCK_OPEN = 182             # 시계형 카드 펼침 (시계 + 시간)
@@ -76,7 +77,7 @@ DEFAULT_SETTINGS = {
     "clock_open": False,  # 시계형 카드에서 시계 펼침 상태
     "sound": True,        # 타자 소리 (Mechvibes 팩)
     "sound_volume": 60,   # 타자 소리 볼륨 (0~100)
-    "pen_volume": 30,     # 펜 긋는 소리 볼륨 (0~100)
+    "pen_volume": 10,     # 펜 긋는 소리 볼륨 (0~100)
     "sound_pack": "banana split lubed",
 }
 DOT_OTHER = "#f0b95e"     # 딴짓 중(작업앱 아님) 표시색
@@ -574,7 +575,9 @@ class Mascot:
         self.shadow = None
         self._z_check = 0.0
         if self.shadow_img is not None:
-            self.shadow = ShadowLayer(self.root, self.shadow_img)
+            # 그림자 이미지가 P만큼 여백을 두므로, 창을 (offset - P)에 놓아 정렬
+            self.shadow = ShadowLayer(self.root, self.shadow_img,
+                                      offset=(7 - SHADOW_PAD, 9 - SHADOW_PAD))
             self.shadow.place(self.root.winfo_rootx(), self.root.winfo_rooty(),
                               self._main_hwnd)
         self._last_pos = None
@@ -608,7 +611,7 @@ class Mascot:
         self.has = {}
         pil_cache = {}
         for name in ("body_open", "pupils", "body_mask", "lashes", "hair",
-                     "eyes_closed", "desk", "arm_pen"):
+                     "eyes_closed", "head", "desk", "arm_pen"):
             self.has[name] = os.path.exists(os.path.join(self.dir, f"{name}.png"))
             if self.has[name]:
                 pil_cache[name] = load_pil(name)
@@ -670,34 +673,39 @@ class Mascot:
                                r[2] * s, r[3] * s + self.oy], blink["color"])
 
     def _build_shadow_img(self):
-        """캐릭터+카드 실루엣을 흐려 만든 반투명 그림자 이미지."""
+        """캐릭터+카드 실루엣을 흐려 만든 반투명 그림자 이미지.
+
+        가장자리 파츠(귀 등)의 그림자가 잘리지 않도록 여백(P)을 두고 그린다.
+        """
         self.shadow_img = None
         if not self.us.get("shadow", True):
             return
         from PIL import ImageDraw, ImageFilter
-        comp = Image.new("RGBA", (self.W, self.H), (0, 0, 0, 0))
-        for name in ("body_open", "lashes", "hair", "desk", "arm_pen"):
+        P = SHADOW_PAD
+        comp = Image.new("RGBA", (self.W + 2 * P, self.H + 2 * P), (0, 0, 0, 0))
+        for name in ("body_open", "lashes", "hair", "head", "desk", "arm_pen"):
             if name in self._pil_cache:
                 x, y = self._pos(name)
-                comp.alpha_composite(self._pil_cache[name], (round(x), round(y)))
+                comp.alpha_composite(self._pil_cache[name], (round(x) + P, round(y) + P))
         for name in ("arm_right", "arm_key"):
             im = self._load_pil(name)
             x, y = self._pos(name)
             if name == "arm_key":
                 x += self.arm_key_off[0]
                 y += self.arm_key_off[1]
-            comp.alpha_composite(im, (round(x), round(y)))
+            comp.alpha_composite(im, (round(x) + P, round(y) + P))
         if self.timer_on:
             d = ImageDraw.Draw(comp)
             cg = self._card_geom()
-            cx0, cy0, cx1, cy1 = cg["x0"], cg["y0"], cg["x1"], cg["y1"]
+            cx0, cy0 = cg["x0"] + P, cg["y0"] + P
+            cx1, cy1 = cg["x1"] + P, cg["y1"] + P
             for ex in (cx0 + 26, cx1 - 26):        # 귀 실루엣
                 d.ellipse([ex - 12, cy0 - 17, ex + 12, cy0 + 7], fill=(0, 0, 0, 255))
             d.rounded_rectangle([cx0, cy0, cx1, cy1], radius=16, fill=(0, 0, 0, 255))
         a = comp.getchannel("A").filter(ImageFilter.GaussianBlur(7))
         a = a.point(lambda v: int(v * 0.30))
-        self.shadow_img = Image.merge(
-            "RGBA", (*Image.new("RGB", (self.W, self.H), (0, 0, 0)).split(), a))
+        black = Image.new("RGB", comp.size, (0, 0, 0))
+        self.shadow_img = Image.merge("RGBA", (*black.split(), a))
 
     def _card_geom(self):
         """현재 타이머 카드의 위치·크기. 시계 펼침이면 세로 직사각형."""
@@ -1174,26 +1182,12 @@ class Mascot:
         if self.timer_on:
             self._draw_timer(self._timer_tick(now, idle), sleeping, now)
 
-        # ── 몸 → 눈동자 → (마스크 몸) → 속눈썹 → 머리카락 ────────────────
+        # ── 몸 (+머리 없는 캐릭터는 여기서 얼굴까지) ─────────────────────
+        # 개는 머리를 팔 위에 그려야 어깨가 안 튀어나오므로, 얼굴을 팔 뒤로 미룬다.
         bx, by = self._pos("body_open")
         c.create_image(bx, by + yo, image=self.im["body_open"], anchor="nw")
-        if not blinking:
-            ex, ey = self._pos("pupils")
-            c.create_image(ex + pdx, ey + yo + pdy, image=self.im["pupils"], anchor="nw")
-        elif self.blink_cfg is not None:
-            (x0, y0, x1, y1), color = self.blink_cfg
-            c.create_rectangle(x0, y0 + yo, x1, y1 + yo, fill=color, outline="")
-        # 눈동자 위 덮개들 — PSD 스택 순서(layout의 overlays) 그대로
-        overlays = self.layout.get("overlays") or \
-            ["body_mask", "lashes", "eyes_closed", "hair"]
-        for name in overlays:
-            if name == "eyes_closed":
-                if not (blinking and self.has.get("eyes_closed")):
-                    continue
-            elif not self.has.get(name):
-                continue
-            ox, oy_ = self._pos(name)
-            c.create_image(ox, oy_ + yo, image=self.im[name], anchor="nw")
+        if not self.has.get("head"):
+            self._draw_face(yo, pdx, pdy, blinking)
 
         # 수면 모드: 머리 옆에 둥실거리는 zzZ
         if sleeping:
@@ -1280,6 +1274,35 @@ class Mascot:
                         self._pen_release_t = now
                     elif now - self._pen_release_t > 0.07:
                         self._pen_playing = False
+
+        # ── 머리(팔 위) + 얼굴 — 개처럼 머리를 분리한 캐릭터 ──────────────
+        # 머리를 팔보다 위에 그려 어깨가 머리 밖으로 튀어나오지 않게 한다.
+        if self.has.get("head"):
+            hx, hy = self._pos("head")
+            c.create_image(hx, hy + yo, image=self.im["head"], anchor="nw")
+            self._draw_face(yo, pdx, pdy, blinking)
+
+    def _draw_face(self, yo, pdx, pdy, blinking):
+        """눈동자(시선) 또는 감은 눈 + 눈 위 덮개들."""
+        c = self.canvas
+        if not blinking:
+            ex, ey = self._pos("pupils")
+            c.create_image(ex + pdx, ey + yo + pdy, image=self.im["pupils"], anchor="nw")
+        elif self.blink_cfg is not None:
+            (x0, y0, x1, y1), color = self.blink_cfg
+            c.create_rectangle(x0, y0 + yo, x1, y1 + yo, fill=color, outline="")
+        overlays = self.layout.get("overlays") or \
+            ["body_mask", "lashes", "eyes_closed", "hair"]
+        for name in overlays:
+            if name == "head":
+                continue                # 머리는 별도 처리
+            if name == "eyes_closed":
+                if not (blinking and self.has.get("eyes_closed")):
+                    continue
+            elif not self.has.get(name):
+                continue
+            ox, oy_ = self._pos(name)
+            c.create_image(ox, oy_ + yo, image=self.im[name], anchor="nw")
 
     def _draw_left(self, now, f):
         """왼손(키보드): 어깨 축 회전으로 키를 옮겨가며 타이핑."""
