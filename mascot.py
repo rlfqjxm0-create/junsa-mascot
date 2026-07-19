@@ -27,6 +27,7 @@ import random
 import sys
 import time
 import tkinter as tk
+from tkinter import font as tkfont
 
 from PIL import Image, ImageTk
 from pynput import keyboard, mouse
@@ -51,7 +52,7 @@ KEY_ROT = (-7.0, 7.0)            # 타이핑 시 손 회전(어깨 축) 범위 (
 PEN_KB_ROT = (-6.0, 6.0)
 TIMER_H = 92                     # 타이머 카드 영역 높이 (게이지형 = 준사)
 OY_CLOCK_COMPACT = 70            # 시계형 카드 접힘 (상태+시간 한 줄)
-OY_CLOCK_OPEN = 190             # 시계형 카드 펼침 (시계 + 시간)
+OY_CLOCK_OPEN = 182             # 시계형 카드 펼침 (시계 + 시간)
 
 # 타이머 카드 팔레트 (준사 배색)
 CARD_BORDER = "#f2b8c6"          # 소프트 핑크
@@ -75,7 +76,8 @@ DEFAULT_SETTINGS = {
     "shadow": True,       # 캐릭터 뒤 옅은 그림자
     "clock_open": False,  # 시계형 카드에서 시계 펼침 상태
     "sound": True,        # 타자 소리 (Mechvibes 팩)
-    "sound_volume": 60,   # 소리 볼륨 (0~100)
+    "sound_volume": 60,   # 타자 소리 볼륨 (0~100)
+    "pen_volume": 30,     # 펜 긋는 소리 볼륨 (0~100)
     "sound_pack": "banana split lubed",
 }
 DOT_OTHER = "#f0b95e"     # 딴짓 중(작업앱 아님) 표시색
@@ -279,39 +281,64 @@ class SoundPack:
 
 
 class PenSound:
-    """선을 긋기 시작할 때 사각거림을 1회 재생. 펜을 떼면 즉시 끊는다."""
+    """긴 연필 루프 음원에서 매번 랜덤 구간을 잘라 재생. 펜을 떼면 즉시 끊는다.
 
-    def __init__(self, folder, volume=60):
+    짧은 클립 여러 개가 아니라 긴 한 파일이 들어오므로, 재생마다 임의의
+    시작점에서 짧은 구간을 떼어낸다. 잘린 경계의 툭 소리를 막으려고
+    구간 앞뒤에 짧은 페이드를 건다.
+    """
+
+    def __init__(self, folder, volume=35):
         import wave
-        self.sounds = []
-        for f in sorted(os.listdir(folder)):
-            if not f.lower().endswith(".wav"):
-                continue
-            with wave.open(os.path.join(folder, f), "rb") as w:
-                ch, sw, fr = w.getnchannels(), w.getsampwidth(), w.getframerate()
-                data = w.readframes(w.getnframes())
-            wfx = _WAVEFORMATEX(1, ch, fr, fr * ch * sw, ch * sw, sw * 8, 0)
-            self.sounds.append((wfx, ctypes.create_string_buffer(data, len(data)),
-                                len(data)))
-        if not self.sounds:
+        wavs = [f for f in os.listdir(folder) if f.lower().endswith(".wav")]
+        if not wavs:
             raise ValueError("펜 소리 wav 없음")
+        # 가장 큰(= 가장 긴) wav를 루프 음원으로 사용
+        path = max((os.path.join(folder, f) for f in wavs), key=os.path.getsize)
+        with wave.open(path, "rb") as w:
+            self.ch, self.sw, self.fr = (w.getnchannels(), w.getsampwidth(),
+                                         w.getframerate())
+            self.pcm = w.readframes(w.getnframes())
+        self.fb = self.ch * self.sw                 # 프레임당 바이트
+        self.nframes = len(self.pcm) // self.fb
+        self.wfx = _WAVEFORMATEX(1, self.ch, self.fr, self.fr * self.fb,
+                                 self.fb, self.sw * 8, 0)
         self.volume = volume
         self._cur = None          # (핸들, WAVEHDR)
+        self._buf = None          # 재생 중 세그먼트 버퍼 유지
+
+    def _segment(self, seg=(0.45, 1.1)):
+        """랜덤 시작점의 [seg] 초 구간 PCM (16bit 페이드 적용)."""
+        import array
+        n = int(random.uniform(*seg) * self.fr)
+        n = min(n, self.nframes)
+        start = random.randint(0, max(self.nframes - n, 0))
+        raw = self.pcm[start * self.fb:(start + n) * self.fb]
+        a = array.array("h")
+        a.frombytes(raw)
+        fade = min(int(self.fr * 0.008), len(a) // 2)   # 8ms 페이드 인/아웃
+        for i in range(fade):
+            g = i / fade
+            a[i] = int(a[i] * g)
+            a[-1 - i] = int(a[-1 - i] * g)
+        return a.tobytes()
 
     def play_once(self):
-        """랜덤 사각거림 하나를 새로 재생 (선 긋기 시작 시 1회 호출)."""
+        """랜덤 구간 하나를 새로 재생 (선 긋기 시작 시 1회 호출)."""
         wm = ctypes.windll.winmm
         if self._cur is not None:
             self._release()
-        wfx, buf, ln = random.choice(self.sounds)
+        seg = self._segment()
+        self._buf = ctypes.create_string_buffer(seg, len(seg))
         h = ctypes.c_void_p()
-        if wm.waveOutOpen(ctypes.byref(h), 0xFFFFFFFF, ctypes.byref(wfx), 0, 0, 0):
+        if wm.waveOutOpen(ctypes.byref(h), 0xFFFFFFFF, ctypes.byref(self.wfx),
+                          0, 0, 0):
             return
         v = max(0, min(int(self.volume * 0xFFFF / 100), 0xFFFF))
         wm.waveOutSetVolume(h, v | (v << 16))
         hdr = _WAVEHDR()
-        hdr.lpData = ctypes.cast(buf, ctypes.c_void_p)
-        hdr.dwBufferLength = ln
+        hdr.lpData = ctypes.cast(self._buf, ctypes.c_void_p)
+        hdr.dwBufferLength = len(seg)
         wm.waveOutPrepareHeader(h, ctypes.byref(hdr), ctypes.sizeof(_WAVEHDR))
         wm.waveOutWrite(h, ctypes.byref(hdr), ctypes.sizeof(_WAVEHDR))
         self._cur = (h, hdr)
@@ -449,6 +476,8 @@ class Mascot:
         self.canvas = tk.Canvas(self.root, width=self.W, height=self.H,
                                 bg=TRANSPARENT, highlightthickness=0)
         self.canvas.pack()
+
+        self._f_status = tkfont.Font(family="Malgun Gothic", size=8)
 
         self._load_parts()
 
@@ -652,7 +681,7 @@ class Mascot:
     def _card_geom(self):
         """현재 타이머 카드의 위치·크기. 시계 펼침이면 세로 직사각형."""
         if self.has_clock and self.clock_open:
-            w, h = 148, 158           # 세로가 살짝 더 긴 직사각형
+            w, h = 148, 150           # 세로가 살짝 더 긴 직사각형
         elif self.has_clock:
             w, h = 196, 40
         else:
@@ -711,7 +740,7 @@ class Mascot:
         if os.path.isdir(pen_dir):
             try:
                 self.pensnd = PenSound(
-                    pen_dir, volume=float(self.us.get("sound_volume", 60)) * 0.8)
+                    pen_dir, volume=float(self.us.get("pen_volume", 30)))
             except Exception:
                 self.pensnd = None
 
@@ -900,11 +929,32 @@ class Mascot:
         return DOT_OFF, "쉬는 중"
 
     def _draw_clock(self, cx, cy, R, now):
-        """아날로그 시계 + 최근 12시간 작업 아크 (도로롱 파레트)."""
+        """아날로그 시계 + 작업한 시간을 시계 안쪽에 연한 분홍으로 채움."""
         c = self.canvas
         cd = self.card
+        arc_fill = cd.get("arc", "#f7d3e6")
+        # 바탕
         c.create_oval(cx - R, cy - R, cx + R, cy + R,
                       fill=cd["bg"], outline=cd["border"], width=2)
+        # 작업한 시간 = 12시간 다이얼 위 파이 조각 (연속 구간으로 묶어 채움)
+        act = (self._ws_data or {}).get("act") or []
+        mods = sorted({(time.localtime(m * 60).tm_hour % 12) * 60
+                       + time.localtime(m * 60).tm_min for m in act})
+        if mods:
+            Rf = R - 2.5
+            runs, s0, p0 = [], mods[0], mods[0]
+            for v in mods[1:]:
+                if v == p0 + 1:
+                    p0 = v
+                else:
+                    runs.append((s0, p0)); s0 = p0 = v
+            runs.append((s0, p0))
+            for a, b in runs:
+                start = 90 - (b + 1) / 720 * 360     # tkinter arc: 0°=3시, 반시계+
+                extent = ((b + 1) - a) / 720 * 360
+                c.create_arc(cx - Rf, cy - Rf, cx + Rf, cy + Rf, start=start,
+                             extent=extent, fill=arc_fill, outline="", style="pieslice")
+        # 시각 눈금
         for i in range(12):
             a = math.radians(i * 30 - 90)
             big = i % 3 == 0
@@ -912,16 +962,6 @@ class Mascot:
             c.create_line(cx + (R - 3) * math.cos(a), cy + (R - 3) * math.sin(a),
                           cx + r2 * math.cos(a), cy + r2 * math.sin(a),
                           fill=cd["sub"], width=2 if big else 1)
-        # 작업 아크: 오전=바깥 링, 오후=안쪽 링 (12시간제 겹침 구분)
-        act = (self._ws_data or {}).get("act") or []
-        r_am, r_pm = R - 2, R - 6
-        for m in act:
-            lt = time.localtime(m * 60)
-            ang = math.radians(((lt.tm_hour % 12) * 60 + lt.tm_min) / 720 * 360 - 90)
-            rr = r_am if lt.tm_hour < 12 else r_pm
-            dx, dy = rr * math.cos(ang), rr * math.sin(ang)
-            c.create_oval(cx + dx - 1.4, cy + dy - 1.4, cx + dx + 1.4, cy + dy + 1.4,
-                          fill=cd["fill"], outline="")
         lt = time.localtime(now)
         hh = lt.tm_hour % 12 + lt.tm_min / 60
         mm = lt.tm_min + lt.tm_sec / 60
@@ -957,13 +997,17 @@ class Mascot:
             c.create_oval(px - r, py - r, px + r, py + r, fill=dot, outline="")
 
         if self.has_clock and self.clock_open:
-            # 세로 카드: 상태(위) → 시계(가운데) → 시간(아래)
-            status_dot(x0 + pad + 5, y0 + 15)
-            c.create_text(x0 + pad + 16, y0 + 15, anchor="w", text=status,
+            # 세로 카드: 상태(위) → 시계(가운데) → 시간(아래) — 모두 정중앙 정렬
+            cxm = (x0 + x1) / 2
+            tw = self._f_status.measure(status)
+            gx = cxm - (16 + tw) / 2            # 점+간격+텍스트 그룹 중앙
+            status_dot(gx + 5, y0 + 16)
+            c.create_text(gx + 16, y0 + 16, anchor="w", text=status,
                           font=("Malgun Gothic", 8), fill=cd["sub"])
             R = 38
-            self._draw_clock((x0 + x1) / 2, y0 + 32 + R, R, now)
-            c.create_text((x0 + x1) / 2, y1 - 15, text=label,
+            clock_cy = y0 + 30 + R
+            self._draw_clock(cxm, clock_cy, R, now)
+            c.create_text(cxm, clock_cy + R + 18, text=label,
                           font=("Malgun Gothic", 14, "bold"), fill=cd["text"])
         elif self.has_clock:
             # 접힘: 상태 + 시간 한 줄 (게이지 없음)
@@ -1240,6 +1284,7 @@ class Mascot:
         v_shadow = tk.BooleanVar(value=bool(self.us.get("shadow", True)))
         v_sound = tk.BooleanVar(value=bool(self.us.get("sound", True)))
         v_vol = tk.IntVar(value=int(self.us.get("sound_volume", 60)))
+        v_pen = tk.IntVar(value=int(self.us.get("pen_volume", 30)))
         cur_pack = str(self.us.get("sound_pack") or "")
         if cur_pack not in self.sound_packs and self.sound_packs:
             cur_pack = self.sound_packs[0]
@@ -1260,29 +1305,32 @@ class Mascot:
         row(5, "타자 소리 볼륨 (%)")
         tk.Spinbox(frame, from_=0, to=100, increment=5, width=6,
                    textvariable=v_vol).grid(row=5, column=1, sticky="w")
+        row(6, "펜 소리 볼륨 (%)")
+        tk.Spinbox(frame, from_=0, to=100, increment=5, width=6,
+                   textvariable=v_pen).grid(row=6, column=1, sticky="w")
         for r, (label, var) in enumerate([("작업 타이머 표시", v_timer),
                                           ("작업 프로그램에서만 시간 측정", v_wonly),
                                           ("타자 소리 (Mechvibes 팩)", v_sound),
                                           ("캐릭터 그림자", v_shadow),
                                           ("타블렛 낙서 표시", v_trail),
-                                          ("항상 위에 표시", v_top)], start=6):
+                                          ("항상 위에 표시", v_top)], start=7):
             tk.Checkbutton(frame, text=label, variable=var, bg=BG, fg=FG,
                            activebackground=BG, font=("Malgun Gothic", 9)
                            ).grid(row=r, column=0, columnspan=2, sticky="w")
         if self.sound_packs:
-            row(12, "타자 소리 팩")
+            row(13, "타자 소리 팩")
             om = tk.OptionMenu(frame, v_pack, *self.sound_packs)
             om.configure(bg="#ffffff", font=("Malgun Gothic", 8),
                          relief="flat", highlightthickness=1)
-            om.grid(row=13, column=0, columnspan=2, sticky="we", pady=(0, 2))
-        row(14, "작업 프로그램 (쉼표 구분)")
+            om.grid(row=14, column=0, columnspan=2, sticky="we", pady=(0, 2))
+        row(15, "작업 프로그램 (쉼표 구분)")
         tk.Entry(frame, textvariable=v_apps, width=26,
-                 font=("Malgun Gothic", 8)).grid(row=15, column=0, columnspan=2,
+                 font=("Malgun Gothic", 8)).grid(row=16, column=0, columnspan=2,
                                                  sticky="we", pady=(0, 2))
 
         info = tk.Label(frame, text="크기·타이머·그림자 변경은 저장 시 재시작됩니다",
                         bg=BG, fg="#b0a3ab", font=("Malgun Gothic", 8))
-        info.grid(row=16, column=0, columnspan=2, pady=(8, 2))
+        info.grid(row=17, column=0, columnspan=2, pady=(8, 2))
 
         def save():
             try:
@@ -1298,6 +1346,7 @@ class Mascot:
                        "shadow": bool(v_shadow.get()),
                        "sound": bool(v_sound.get()),
                        "sound_volume": max(0, min(100, int(v_vol.get()))),
+                       "pen_volume": max(0, min(100, int(v_pen.get()))),
                        "sound_pack": v_pack.get()}
             except Exception:
                 return
@@ -1317,7 +1366,7 @@ class Mascot:
         tk.Button(frame, text="저장", command=save, width=10,
                   bg=CARD_BORDER, fg="#5b3a44", relief="flat",
                   font=("Malgun Gothic", 9, "bold")).grid(
-            row=17, column=0, columnspan=2, pady=(6, 0))
+            row=18, column=0, columnspan=2, pady=(6, 0))
 
     def _save_settings(self):
         try:
