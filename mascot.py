@@ -272,7 +272,7 @@ class SoundPack:
 
 
 class PenSound:
-    """그리는 동안 연필 사각거림을 이어 재생. 멈추면 즉시 끊는다."""
+    """선을 긋기 시작할 때 사각거림을 1회 재생. 펜을 떼면 즉시 끊는다."""
 
     def __init__(self, folder, volume=60):
         import wave
@@ -291,12 +291,10 @@ class PenSound:
         self.volume = volume
         self._cur = None          # (핸들, WAVEHDR)
 
-    def ensure_playing(self):
-        """재생 중이 아니면 랜덤 사각거림 하나 시작."""
+    def play_once(self):
+        """랜덤 사각거림 하나를 새로 재생 (선 긋기 시작 시 1회 호출)."""
         wm = ctypes.windll.winmm
         if self._cur is not None:
-            if not (self._cur[1].dwFlags & 0x1):   # 아직 재생 중
-                return
             self._release()
         wfx, buf, ln = random.choice(self.sounds)
         h = ctypes.c_void_p()
@@ -492,6 +490,7 @@ class Mascot:
         # ── 타자 소리 / 펜 소리 ──────────────────────────────────────────
         self.sndpack = None
         self.pensnd = None
+        self._pen_drawing_prev = False
         self.sound_packs = self._list_packs()
         self._init_sound()
 
@@ -1062,12 +1061,13 @@ class Mascot:
             c.create_image(px + ddx, py + ddy,
                            image=self.im["arm_pen"], anchor="nw")
             self._draw_left(now, f)
-            # 그리는 동안 연필 사각거림
+            # 연필 사각거림: 선 긋기 시작 순간에만 1회, 떼면 즉시 정지
             if self.pensnd is not None and "pen" not in f:
-                if drawing:
-                    self.pensnd.ensure_playing()
-                else:
+                if drawing and not self._pen_drawing_prev:
+                    self.pensnd.play_once()
+                elif not drawing:
                     self.pensnd.stop()
+                self._pen_drawing_prev = drawing
 
     def _draw_left(self, now, f):
         """왼손(키보드): 어깨 축 회전으로 키를 옮겨가며 타이핑."""
