@@ -1,7 +1,7 @@
 {
- "version": 1784412872,
+ "version": 1784440882,
  "files": {
-  "mascot.py": "0cd88508280fbce6bb1cbaeab30203f0c21dc2779b0c0991508ce921dcd7dc77",
+  "mascot.py": "2c4eefaf2daca394d99af2005a2be21cceede43cbffda4f5aeb047f9a684e31c",
   "parts_junsa/arm_key.png": "f31411e91c5897a8b8a3911d91d05ddb5d61842545ac0a88db39abc5a119485c",
   "parts_junsa/arm_pen.png": "69d1c8ef4a89c79257607503776947e0c1190a0d694b4bfefcf6add44dd842d3",
   "parts_junsa/arm_right.png": "1027198c07e917cbcf16db0242280f8d337912091af937051878229785e72c2c",
@@ -12,7 +12,7 @@
   "parts_junsa/eyes_closed.png": "fd094c16062b4d1af4274220b785fc748195ebc406bffe2673e82d3978f09e15",
   "parts_junsa/hair.png": "3d23e3c2e207b1c5d71dfebf13514aad842faf1599c708244fb4ddaae931a3ba",
   "parts_junsa/lashes.png": "aea2649410308f66078d48f3d3580a523ba1cea34252c75aee8e9ef65d6d7ab8",
-  "parts_junsa/layout.json": "fa72bbe5f25512f6c82b65480b47cd47785a6d416d48fb282309723425ac506c",
+  "parts_junsa/layout.json": "db6d4b7e780ec84c19e2b5f899ef8c1863b1d31c6fb9f706f46f612255bb21f0",
   "parts_junsa/pupils.png": "942f010b921cfe0c4f4e8b22a7d8685c8139ee78c29f07ec835ee07cc04aaec9",
   "parts_junsa/sounds/apex-pro-tkl-v2_Akira/config.json": "1fc06af40c17bb41cc1c1fd9c22a4cbd88746e55c38bc582400e6cda3aa93ebf",
   "parts_junsa/sounds/apex-pro-tkl-v2_Akira/enter.wav": "fe7998dabcc579dd88b8ecb3b22f942efc880bd75f9794b792a41f5c10b51ef3",

@@ -412,6 +412,21 @@ class Mascot:
         self.oy = TIMER_H if self.timer_on else 0   # 캐릭터 전체 y 오프셋
         self._settings_win = None
 
+        # 타이머 카드 테마 (캐릭터별 config의 card 섹션)
+        cc = self.cfg.get("card") or {}
+        self.card = {
+            "bg": cc.get("bg", "#ffffff"), "border": cc.get("border", CARD_BORDER),
+            "text": cc.get("text", CARD_NAVY), "sub": cc.get("sub", CARD_GRAY),
+            "track": cc.get("track", CARD_TRACK), "fill": cc.get("fill", CARD_FILL),
+            "deco": cc.get("deco", "panda"),
+        }
+
+        # 워크스페이스 워크타이머 연동 (config의 workspace_timer = 라이브 파일 경로)
+        ws = self.cfg.get("workspace_timer")
+        self.ws_path = os.path.normpath(os.path.join(HERE, ws)) if ws else None
+        self._ws_data = None
+        self._ws_read = 0.0
+
         cw, ch = self.layout["canvas"]
         self.W, self.H = round(cw * s), round(ch * s) + self.oy
 
@@ -457,7 +472,7 @@ class Mascot:
         self._fg_checked = 0.0
         self._fg_work = False
         self.state_path = os.path.join(self.state_dir, ".timer_state.json")
-        if self.timer_on:
+        if self.timer_on and self.ws_path is None:
             self._timer_load()
 
         # ── 창 드래그 이동 / 우클릭 메뉴 ─────────────────────────────────
@@ -466,8 +481,10 @@ class Mascot:
         self.canvas.bind("<B1-Motion>", self._drag_move)
         menu = tk.Menu(self.root, tearoff=0)
         menu.add_command(label="환경설정", command=self.open_settings)
-        if self.timer_on:
+        if self.timer_on and self.ws_path is None:
             menu.add_command(label="타이머 초기화", command=self._timer_reset)
+        if self.ws_path is not None:
+            menu.add_command(label="기본 타이머로 전환", command=self.close)
         menu.add_separator()
         menu.add_command(label="종료", command=self.close)
         self.canvas.bind("<Button-3>", lambda e: menu.tk_popup(e.x_root, e.y_root))
@@ -697,7 +714,7 @@ class Mascot:
 
     def close(self):
         try:
-            if self.timer_on:
+            if self.timer_on and self.ws_path is None:
                 self._timer_save()
             self._kb.stop()
             self._ms.stop()
@@ -736,7 +753,26 @@ class Mascot:
         return self._fg_work
 
     def _timer_tick(self, now, idle):
-        """상태 반환: 'work'(측정) / 'other'(작업앱 아님) / 'idle'(휴식)."""
+        """상태 반환: work(측정)/other(작업앱 아님)/idle(휴식)/off(연동 끊김)."""
+        if self.ws_path is not None:
+            # 워크스페이스 워크타이머 연동: 에이전트의 라이브 파일을 읽어 표시만 한다
+            if now - self._ws_read > 1.0:
+                self._ws_read = now
+                try:
+                    with open(self.ws_path, encoding="utf-8") as fp:
+                        self._ws_data = json.load(fp)
+                except Exception:
+                    self._ws_data = None
+            d = self._ws_data
+            if not d or now - float(d.get("ts", 0)) > 8:
+                return "off"          # 워크타이머가 꺼져 있음
+            self.work_secs = float(d.get("total", 0))
+            if d.get("active"):
+                return "work"
+            if d.get("idle") or idle >= self.idle_thr:
+                return "idle"
+            return "other"
+
         dt = min(max(now - self._t_last, 0.0), 2.0)
         self._t_last = now
         if idle >= self.idle_thr:
@@ -758,8 +794,11 @@ class Mascot:
 
     def _draw_timer(self, state, sleeping, now):
         c = self.canvas
+        cd = self.card
         active = state == "work"
-        if sleeping:
+        if state == "off":
+            dot, status = DOT_OFF, "타이머 꺼짐"
+        elif sleeping:
             dot, status = DOT_OFF, "자는 중"
         elif state == "work":
             dot, status = DOT_ON, "작업중"
@@ -773,16 +812,33 @@ class Mascot:
         x0, y0 = (self.W - w) / 2, 22
         x1, y1 = x0 + w, y0 + h
 
-        # 판다 귀 — 동그란 원이 카드 위로 반 이상 빼꼼
-        for ex in (x0 + 26, x1 - 26):
-            c.create_oval(ex - 12, y0 - 17, ex + 12, y0 + 7,
-                          fill="#2b2b2b", outline="")
-            c.create_oval(ex - 6, y0 - 11, ex + 6, y0 + 1,
-                          fill="#4a4a4a", outline="")
+        # 카드 위 장식 — 캐릭터 컨셉에 맞게
+        if cd["deco"] == "panda":
+            for ex in (x0 + 26, x1 - 26):
+                c.create_oval(ex - 12, y0 - 17, ex + 12, y0 + 7,
+                              fill="#2b2b2b", outline="")
+                c.create_oval(ex - 6, y0 - 11, ex + 6, y0 + 1,
+                              fill="#4a4a4a", outline="")
+        elif cd["deco"] == "rose":
+            # 장미 헤어번 모티프: 소용돌이 든 분홍 원 + 리본
+            for i, ex in enumerate((x0 + 26, x1 - 26)):
+                c.create_oval(ex - 12, y0 - 17, ex + 12, y0 + 7,
+                              fill="#f5bdd2", outline="#d687ab", width=2)
+                c.create_arc(ex - 8, y0 - 13, ex + 8, y0 + 3,
+                             start=300, extent=270, style="arc",
+                             outline="#d687ab", width=2)
+                c.create_arc(ex - 4, y0 - 9, ex + 4, y0 - 1,
+                             start=120, extent=230, style="arc",
+                             outline="#d687ab", width=2)
+            rx = x1 - 26
+            c.create_polygon(rx - 2, y0 + 3, rx - 14, y0 + 10, rx - 12, y0 + 2,
+                             fill="#b9aed6", outline="")
+            c.create_polygon(rx + 2, y0 + 3, rx + 14, y0 + 10, rx + 12, y0 + 2,
+                             fill="#b9aed6", outline="")
         # 그림자 + 카드
         self._rrect(x0 + 2, y0 + 3, x1 + 2, y1 + 3, 16, fill="#e3e6ee", outline="")
-        self._rrect(x0, y0, x1, y1, 16, fill="#ffffff",
-                    outline=CARD_BORDER, width=2)
+        self._rrect(x0, y0, x1, y1, 16, fill=cd["bg"],
+                    outline=cd["border"], width=2)
 
         # 윗줄: 상태 점(작업중이면 콩닥콩닥) + 상태 + 시간
         row1 = y0 + 20
@@ -791,9 +847,9 @@ class Mascot:
         c.create_oval(x0 + 18 - r, row1 - r, x0 + 18 + r, row1 + r,
                       fill=dot, outline="")
         c.create_text(x0 + 30, row1, anchor="w", text=status,
-                      font=("Malgun Gothic", 8), fill=CARD_GRAY)
+                      font=("Malgun Gothic", 8), fill=cd["sub"])
         c.create_text(x1 - 16, row1, anchor="e", text=label,
-                      font=("Malgun Gothic", 13, "bold"), fill=CARD_NAVY)
+                      font=("Malgun Gothic", 13, "bold"), fill=cd["text"])
 
         # 아랫줄: 목표 진행바 (숫자와 넉넉히 띄움)
         goal = max(float(self.us["goal_hours"]), 0.5) * 3600
@@ -801,14 +857,14 @@ class Mascot:
         row2 = y0 + 45
         bx0, bx1 = x0 + 16, x1 - 50
         c.create_line(bx0, row2, bx1, row2, width=6, capstyle="round",
-                      fill=CARD_TRACK)
+                      fill=cd["track"])
         if frac > 0.01:
             c.create_line(bx0, row2, bx0 + (bx1 - bx0) * frac, row2,
                           width=6, capstyle="round",
-                          fill="#7ccf8f" if frac >= 1.0 else CARD_FILL)
+                          fill="#7ccf8f" if frac >= 1.0 else cd["fill"])
         c.create_text(x1 - 16, row2, anchor="e", text=f"{int(frac * 100)}%",
                       font=("Malgun Gothic", 8, "bold"),
-                      fill="#5aa86e" if frac >= 1.0 else CARD_GRAY)
+                      fill="#5aa86e" if frac >= 1.0 else cd["sub"])
 
     # ── 매 프레임 갱신 (~30fps) ──────────────────────────────────────────
     def tick(self):
@@ -912,17 +968,17 @@ class Mascot:
         elif self.blink_cfg is not None:
             (x0, y0, x1, y1), color = self.blink_cfg
             c.create_rectangle(x0, y0 + yo, x1, y1 + yo, fill=color, outline="")
-        for overlay in ("body_mask", "lashes"):
-            if self.has.get(overlay):
-                ox, oy_ = self._pos(overlay)
-                c.create_image(ox, oy_ + yo, image=self.im[overlay], anchor="nw")
-        # 눈깜빡 파츠: PSD 스택 위치 그대로 속눈썹 위·머리카락 아래
-        if blinking and self.has.get("eyes_closed"):
-            ox, oy_ = self._pos("eyes_closed")
-            c.create_image(ox, oy_ + yo, image=self.im["eyes_closed"], anchor="nw")
-        if self.has.get("hair"):
-            ox, oy_ = self._pos("hair")
-            c.create_image(ox, oy_ + yo, image=self.im["hair"], anchor="nw")
+        # 눈동자 위 덮개들 — PSD 스택 순서(layout의 overlays) 그대로
+        overlays = self.layout.get("overlays") or \
+            ["body_mask", "lashes", "eyes_closed", "hair"]
+        for name in overlays:
+            if name == "eyes_closed":
+                if not (blinking and self.has.get("eyes_closed")):
+                    continue
+            elif not self.has.get(name):
+                continue
+            ox, oy_ = self._pos(name)
+            c.create_image(ox, oy_ + yo, image=self.im[name], anchor="nw")
 
         # 수면 모드: 머리 옆에 둥실거리는 zzZ
         if sleeping:

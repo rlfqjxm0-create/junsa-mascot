@@ -114,5 +114,10 @@
    1024,
    1278
   ]
- }
+ },
+ "overlays": [
+  "lashes",
+  "eyes_closed",
+  "hair"
+ ]
 }
