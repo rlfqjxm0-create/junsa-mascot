@@ -27,7 +27,6 @@ import random
 import sys
 import time
 import tkinter as tk
-from tkinter import font as tkfont
 
 from PIL import Image, ImageTk
 from pynput import keyboard, mouse
@@ -502,7 +501,7 @@ class Mascot:
                                 bg=TRANSPARENT, highlightthickness=0)
         self.canvas.pack()
 
-        self._f_status = tkfont.Font(family="Malgun Gothic", size=8)
+        self._tw_cache = {}          # 상태 텍스트 폭 캐시 (캔버스로 측정)
 
         self._load_parts()
 
@@ -915,6 +914,18 @@ class Mascot:
             self._timer_save()
         return state
 
+    def _text_w(self, text):
+        """상태 텍스트 폭(px) — 캔버스로 측정·캐시 (tkinter.font 의존 제거)."""
+        w = self._tw_cache.get(text)
+        if w is None:
+            t = self.canvas.create_text(-2000, -2000, text=text, anchor="nw",
+                                        font=("Malgun Gothic", 8))
+            bb = self.canvas.bbox(t)
+            w = (bb[2] - bb[0]) if bb else len(text) * 11
+            self.canvas.delete(t)
+            self._tw_cache[text] = w
+        return w
+
     def _rrect(self, x0, y0, x1, y1, r, **kw):
         pts = [x0 + r, y0, x1 - r, y0, x1, y0, x1, y0 + r, x1, y1 - r, x1, y1,
                x1 - r, y1, x0 + r, y1, x0, y1, x0, y1 - r, x0, y0 + r, x0, y0]
@@ -1027,7 +1038,7 @@ class Mascot:
         if self.has_clock and self.clock_open:
             # 세로 카드: 상태(위) → 시계(가운데) → 시간(아래) — 모두 정중앙 정렬
             cxm = (x0 + x1) / 2
-            tw = self._f_status.measure(status)
+            tw = self._text_w(status)
             gx = cxm - (16 + tw) / 2            # 점+간격+텍스트 그룹 중앙
             status_dot(gx + 5, y0 + 16)
             c.create_text(gx + 16, y0 + 16, anchor="w", text=status,
