@@ -192,6 +192,25 @@ class _WAVEHDR(ctypes.Structure):
                 ("lpNext", ctypes.c_void_p), ("reserved", ctypes.c_void_p)]
 
 
+# 샘플 폭(바이트)별 정수 타입 — 볼륨을 샘플에 곱할 때 사용
+_SAMPLE_CTYPE = {1: ctypes.c_int8, 2: ctypes.c_int16, 4: ctypes.c_int32}
+
+
+def _scaled_buffer(data, gain, sampwidth):
+    """PCM 바이트에 gain을 곱한 재생 버퍼. 비트 심도(16/32bit)에 맞춰 스케일.
+
+    waveOutSetVolume이 드라이버에 무시될 수 있어 샘플 값 자체를 조절한다.
+    """
+    buf = ctypes.create_string_buffer(data, len(data))
+    ct = _SAMPLE_CTYPE.get(sampwidth)
+    if gain < 0.999 and ct is not None and len(data) >= sampwidth:
+        n = len(data) // sampwidth
+        arr = (ct * n).from_buffer(buf)
+        for i in range(n):
+            arr[i] = int(arr[i] * gain)
+    return buf
+
+
 class SoundPack:
     """Mechvibes 사운드 팩(multi 타입: 키별 wav) 재생기.
 
@@ -211,7 +230,7 @@ class SoundPack:
         for v in cfg.get("defines", {}).values():
             if isinstance(v, str) and v and v not in names:
                 names.append(v)
-        self.raw = []             # (WAVEFORMATEX, 원본PCM)
+        self.raw = []             # (WAVEFORMATEX, 원본PCM, 샘플폭)
         for name in names:
             path = os.path.join(folder, name)
             if not (name.lower().endswith(".wav") and os.path.exists(path)):
@@ -220,7 +239,7 @@ class SoundPack:
                 ch, sw, fr = w.getnchannels(), w.getsampwidth(), w.getframerate()
                 data = w.readframes(w.getnframes())
             wfx = _WAVEFORMATEX(1, ch, fr, fr * ch * sw, ch * sw, sw * 8, 0)
-            self.raw.append((wfx, data))
+            self.raw.append((wfx, data, sw))
         if not self.raw:
             raise ValueError("재생 가능한 wav가 없음")
         self._active = []         # (핸들, WAVEHDR) — 재생 끝나면 정리
@@ -234,14 +253,8 @@ class SoundPack:
         self.sounds = []          # (WAVEFORMATEX, 버퍼, 길이)
         if gain <= 0.0:
             return
-        for wfx, data in self.raw:
-            buf = ctypes.create_string_buffer(data, len(data))
-            if gain < 0.999:
-                n = len(data) // 2
-                arr = (ctypes.c_int16 * n).from_buffer(buf)
-                for i in range(n):
-                    arr[i] = int(arr[i] * gain)
-            self.sounds.append((wfx, buf, len(data)))
+        for wfx, data, sw in self.raw:
+            self.sounds.append((wfx, _scaled_buffer(data, gain, sw), len(data)))
 
     def play(self, key):
         if not self.sounds:
@@ -304,7 +317,7 @@ class PenSound:
 
     def __init__(self, folder, volume=35):
         import wave
-        self.raw = []             # (WAVEFORMATEX, 원본PCM bytes)
+        self.raw = []             # (WAVEFORMATEX, 원본PCM, 샘플폭)
         names = [f for f in sorted(os.listdir(folder)) if f.lower().endswith(".wav")]
         clips = [f for f in names if f.lower().startswith("clip")] or names
         for f in clips:
@@ -312,7 +325,7 @@ class PenSound:
                 ch, sw, fr = w.getnchannels(), w.getsampwidth(), w.getframerate()
                 data = w.readframes(w.getnframes())
             wfx = _WAVEFORMATEX(1, ch, fr, fr * ch * sw, ch * sw, sw * 8, 0)
-            self.raw.append((wfx, data))
+            self.raw.append((wfx, data, sw))
         if not self.raw:
             raise ValueError("펜 소리 wav 없음")
         self.set_volume(volume)
@@ -325,14 +338,8 @@ class PenSound:
         self.clips = []           # (WAVEFORMATEX, 버퍼, 길이)
         if gain <= 0.0:
             return                # 무음이면 버퍼 안 만듦 → play()가 그냥 반환
-        for wfx, data in self.raw:
-            buf = ctypes.create_string_buffer(data, len(data))
-            if gain < 0.999:
-                n = len(data) // 2
-                arr = (ctypes.c_int16 * n).from_buffer(buf)
-                for i in range(n):
-                    arr[i] = int(arr[i] * gain)
-            self.clips.append((wfx, buf, len(data)))
+        for wfx, data, sw in self.raw:
+            self.clips.append((wfx, _scaled_buffer(data, gain, sw), len(data)))
 
     def play(self):
         """랜덤 클립 하나 재생 (선 긋기 시작 시). 볼륨 0이면 무음."""
@@ -936,6 +943,13 @@ class Mascot:
                 c.create_polygon(ex - 6 * sign, y0 + 2, ex + 3 * sign, y0 - 10,
                                  ex + 8 * sign, y0 + 1,
                                  fill="#eba0c0", outline="")
+        elif deco == "dog":
+            # 접힌 검은 강아지 귀 — 카드 위 모서리에서 바깥으로 늘어짐
+            for sign, ex in ((-1, x0 + 18), (1, x1 - 18)):
+                c.create_oval(ex - 15, y0 - 15, ex + 9, y0 + 28,
+                              fill="#2b2b2b", outline="")
+                c.create_oval(ex - 9, y0 - 7, ex + 3, y0 + 14,
+                              fill="#4a4a4a", outline="")
         elif deco == "rose":
             for ex in (x0 + 26, x1 - 26):
                 c.create_oval(ex - 12, y0 - 17, ex + 12, y0 + 7,
