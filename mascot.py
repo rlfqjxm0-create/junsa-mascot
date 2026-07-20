@@ -623,6 +623,13 @@ class Mascot:
                 pil_cache[name] = load_pil(name)
                 self.im[name] = ImageTk.PhotoImage(pil_cache[name])
 
+        # 타이머 카드 가로 중심 = 책상 내용의 중심 (캔버스 중심이 아니라)
+        self.card_cx = self.W / 2
+        if "desk" in pil_cache:
+            bb = pil_cache["desk"].split()[3].getbbox()
+            if bb:
+                self.card_cx = (bb[0] + bb[2]) / 2
+
         # 회전 손 파츠: 어깨(최상단) 앵커 기준으로 회전 — 어깨가 몸에서 안 떨어짐
         self.hop = {}
         for name in ("arm_key", "arm_right_typing"):
@@ -721,7 +728,7 @@ class Mascot:
             w, h = 196, 40
         else:
             w, h = 200, 62
-        x0 = (self.W - w) / 2
+        x0 = getattr(self, "card_cx", self.W / 2) - w / 2
         y0 = 22
         return {"x0": x0, "y0": y0, "x1": x0 + w, "y1": y0 + h, "w": w, "h": h}
 
@@ -985,31 +992,40 @@ class Mascot:
         return DOT_OFF, "쉬는 중"
 
     def _draw_clock(self, cx, cy, R, now):
-        """아날로그 시계 + 작업한 시간을 시계 안쪽에 연한 분홍으로 채움."""
+        """아날로그 시계 + 작업한 시간만 가장자리 링(호)에 표시 (오전=바깥/오후=안쪽)."""
         c = self.canvas
         cd = self.card
-        arc_fill = cd.get("arc", "#f7d3e6")
+        arc_fill = cd.get("arc", "#f2a7c5")
         # 바탕
         c.create_oval(cx - R, cy - R, cx + R, cy + R,
                       fill=cd["bg"], outline=cd["border"], width=2)
-        # 작업한 시간 = 12시간 다이얼 위 파이 조각 (연속 구간으로 묶어 채움)
+        # 작업한 시간 = 12시간 다이얼 위 링(작업한 분만). 오전 바깥, 오후 안쪽.
         act = (self._ws_data or {}).get("act") or []
-        mods = sorted({(time.localtime(m * 60).tm_hour % 12) * 60
-                       + time.localtime(m * 60).tm_min for m in act})
-        if mods:
-            Rf = R - 2.5
-            runs, s0, p0 = [], mods[0], mods[0]
-            for v in mods[1:]:
-                if v == p0 + 1:
-                    p0 = v
+        am, pm = set(), set()
+        for m in act:
+            lt = time.localtime(m * 60)
+            (am if lt.tm_hour < 12 else pm).add((lt.tm_hour % 12) * 60 + lt.tm_min)
+
+        def runs_of(positions):
+            s = sorted(positions)
+            out = []
+            if not s:
+                return out
+            a = p = s[0]
+            for v in s[1:]:
+                if v == p + 1:
+                    p = v
                 else:
-                    runs.append((s0, p0)); s0 = p0 = v
-            runs.append((s0, p0))
-            for a, b in runs:
-                start = 90 - (b + 1) / 720 * 360     # tkinter arc: 0°=3시, 반시계+
-                extent = ((b + 1) - a) / 720 * 360
-                c.create_arc(cx - Rf, cy - Rf, cx + Rf, cy + Rf, start=start,
-                             extent=extent, fill=arc_fill, outline="", style="pieslice")
+                    out.append((a, p)); a = p = v
+            out.append((a, p))
+            return out
+
+        for positions, rr in ((am, R - 3), (pm, R - 7)):
+            for a, b in runs_of(positions):
+                start = 90 - (b + 1) / 720 * 360
+                extent = max(((b + 1) - a) / 720 * 360, 1.2)   # 1분도 보이게 최소폭
+                c.create_arc(cx - rr, cy - rr, cx + rr, cy + rr, start=start,
+                             extent=extent, style="arc", outline=arc_fill, width=3)
         # 시각 눈금
         for i in range(12):
             a = math.radians(i * 30 - 90)
