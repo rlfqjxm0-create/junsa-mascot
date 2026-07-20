@@ -562,6 +562,7 @@ class Mascot:
 
         # ── 전역 입력 리스너 ──────────────────────────────────────────────
         self._held = set()
+        self._key_times = {}          # 키별 마지막 눌림 시각 (다이얼 연타 감지)
         self._kb = keyboard.Listener(on_press=self._on_key,
                                      on_release=self._on_key_release)
         self._ms = mouse.Listener(on_click=self._on_click, on_move=self._on_move)
@@ -791,12 +792,16 @@ class Mascot:
     # ── 입력 콜백 ─────────────────────────────────────────────────────────
     def _on_key(self, key):
         self.key_events += 1
-        # 꾹 누르고 있을 때의 자동 반복은 소리 제외 — 최초 눌림만 소리
+        now = time.time()
         k = str(key)
-        first = k not in self._held
+        first = k not in self._held           # 꾹 누름(자동 반복)은 최초만
         self._held.add(k)
+        # 투어박스 등 다이얼: 같은 키를 사람 타이핑보다 빠르게(90ms 이내) 연타 →
+        # 소리 억제 (브러시 크기·화면 회전 돌릴 때 키보드 소리 안 나게)
+        dial = (now - self._key_times.get(k, 0)) < 0.09
+        self._key_times[k] = now
         sp = self.sndpack
-        if first and sp is not None:
+        if first and not dial and sp is not None:
             try:
                 sp.play(key)
             except Exception:
