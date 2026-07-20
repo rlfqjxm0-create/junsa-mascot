@@ -753,11 +753,21 @@ class Mascot:
 
     # ── 타자 소리 ─────────────────────────────────────────────────────────
     def _list_packs(self):
-        base = os.path.join(self.dir, "sounds")
-        if not os.path.isdir(base):
-            return []
-        return sorted(d for d in os.listdir(base)
-                      if os.path.exists(os.path.join(base, d, "config.json")))
+        """타자 소리 팩 목록. 캐릭터 sounds/ + 공용 '타이핑 음원/' 폴더를 함께 스캔.
+
+        사용자가 ena-mascot/타이핑 음원/ 에 (압축 푼) Mechvibes 팩 폴더를 넣으면
+        자동으로 목록에 추가된다. pack 이름 → 폴더 경로를 self._pack_paths에 저장.
+        """
+        self._pack_paths = {}
+        for base in (os.path.join(self.dir, "sounds"),
+                     os.path.join(HERE, "타이핑 음원")):
+            if not os.path.isdir(base):
+                continue
+            for d in os.listdir(base):
+                p = os.path.join(base, d)
+                if d != "pen" and os.path.exists(os.path.join(p, "config.json")):
+                    self._pack_paths.setdefault(d, p)   # 먼저 찾은 것 우선
+        return sorted(self._pack_paths)
 
     def _init_sound(self):
         if self.sndpack is not None:
@@ -779,9 +789,11 @@ class Mascot:
         name = str(self.us.get("sound_pack") or "")
         if name not in self.sound_packs:
             name = self.sound_packs[0]
+        pack_dir = getattr(self, "_pack_paths", {}).get(
+            name, os.path.join(self.dir, "sounds", name))
         try:
-            self.sndpack = SoundPack(os.path.join(self.dir, "sounds", name),
-                                     volume=float(self.us.get("sound_volume", 60)))
+            self.sndpack = SoundPack(
+                pack_dir, volume=float(self.us.get("sound_volume", 60)))
         except Exception:
             self.sndpack = None
         pen_dir = os.path.join(self.dir, "sounds", "pen")
