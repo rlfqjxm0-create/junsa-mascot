@@ -589,12 +589,16 @@ class Mascot:
 
     # ── 파츠 로드 (모든 좌표는 표시 배율 + y 오프셋 적용) ─────────────────
     def _hard(self, im):
-        """반투명 가장자리 픽셀 이분화 — 밝은 캐릭터의 검은 테두리 방지."""
+        """반투명 가장자리 픽셀 이분화 — 색상키 투명의 어두운 테두리(fringe) 방지.
+
+        밝은 캐릭터가 어두운 배경에서 회색 테두리가 지는 문제를, 가장자리 알파를
+        50% 기준으로 켜고 끄는 이분화로 없앤다(부드럽진 않지만 테두리가 안 생김).
+        """
         if not self.cfg.get("hard_alpha"):
             return im
         r, g, b, a = im.split()
         im = im.copy()
-        im.putalpha(a.point(lambda v: 255 if v >= 60 else 0))
+        im.putalpha(a.point(lambda v: 255 if v >= 128 else 0))
         return im
 
     def _load_parts(self):
