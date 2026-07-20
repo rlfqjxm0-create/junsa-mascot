@@ -992,40 +992,32 @@ class Mascot:
         return DOT_OFF, "쉬는 중"
 
     def _draw_clock(self, cx, cy, R, now):
-        """아날로그 시계 + 작업한 시간만 가장자리 링(호)에 표시 (오전=바깥/오후=안쪽)."""
+        """아날로그 시계 + 작업한 시간을 방사형 선으로(기존 '작업 흔적' 방식).
+
+        작업한 분마다 중심→가장자리 방향으로 선 하나(오전=연한색/오후=진한색).
+        연속 작업이면 부채꼴처럼 촘촘히 채워지고, 안 한 시간대는 비어 있다.
+        """
         c = self.canvas
         cd = self.card
-        arc_fill = cd.get("arc", "#f2a7c5")
+        am_col = cd.get("arc_am", "#f4c9dd")     # 오전 = 연한 분홍
+        pm_col = cd.get("arc_pm", "#e493bd")     # 오후 = 진한 분홍
         # 바탕
         c.create_oval(cx - R, cy - R, cx + R, cy + R,
                       fill=cd["bg"], outline=cd["border"], width=2)
-        # 작업한 시간 = 12시간 다이얼 위 링(작업한 분만). 오전 바깥, 오후 안쪽.
-        act = (self._ws_data or {}).get("act") or []
-        am, pm = set(), set()
-        for m in act:
+        # 작업한 분 = 방사형 선 (12시간 다이얼 위치)
+        Rf = R - 3
+        seen = set()
+        for m in ((self._ws_data or {}).get("act") or []):
             lt = time.localtime(m * 60)
-            (am if lt.tm_hour < 12 else pm).add((lt.tm_hour % 12) * 60 + lt.tm_min)
-
-        def runs_of(positions):
-            s = sorted(positions)
-            out = []
-            if not s:
-                return out
-            a = p = s[0]
-            for v in s[1:]:
-                if v == p + 1:
-                    p = v
-                else:
-                    out.append((a, p)); a = p = v
-            out.append((a, p))
-            return out
-
-        for positions, rr in ((am, R - 3), (pm, R - 7)):
-            for a, b in runs_of(positions):
-                start = 90 - (b + 1) / 720 * 360
-                extent = max(((b + 1) - a) / 720 * 360, 1.2)   # 1분도 보이게 최소폭
-                c.create_arc(cx - rr, cy - rr, cx + rr, cy + rr, start=start,
-                             extent=extent, style="arc", outline=arc_fill, width=3)
+            pos = (lt.tm_hour % 12) * 60 + lt.tm_min
+            key = (pos, lt.tm_hour < 12)
+            if key in seen:
+                continue
+            seen.add(key)
+            a = math.radians(pos / 720 * 360 - 90)
+            col = am_col if lt.tm_hour < 12 else pm_col
+            c.create_line(cx, cy, cx + Rf * math.cos(a), cy + Rf * math.sin(a),
+                          fill=col, width=1)
         # 시각 눈금
         for i in range(12):
             a = math.radians(i * 30 - 90)
