@@ -75,6 +75,7 @@ DEFAULT_SETTINGS = {
     "sleep_min": 10,      # 이 시간(분) 동안 무입력이면 수면 모드
     "shadow": True,       # 캐릭터 뒤 옅은 그림자
     "clock_open": False,  # 시계형 카드에서 시계 펼침 상태
+    "autostart": True,    # 윈도우 시작 시 자동 실행 (exe로 배포된 경우만 적용)
     "sound": True,        # 타자 소리 (Mechvibes 팩)
     "sound_volume": 60,   # 타자 소리 볼륨 (0~100)
     "pen_volume": 10,     # 펜 긋는 소리 볼륨 (0~100)
@@ -582,6 +583,8 @@ class Mascot:
             self.shadow.place(self.root.winfo_rootx(), self.root.winfo_rooty(),
                               self._main_hwnd)
         self._last_pos = None
+
+        self._apply_autostart()          # exe 배포본이면 시작프로그램 등록
 
         if preview:
             self.root.after(600, self._preview_shots)
@@ -1398,29 +1401,38 @@ class Mascot:
         row(6, "펜 소리 볼륨 (%)")
         tk.Spinbox(frame, from_=0, to=100, increment=5, width=6,
                    textvariable=v_pen).grid(row=6, column=1, sticky="w")
-        for r, (label, var) in enumerate([("작업 타이머 표시", v_timer),
-                                          ("작업 프로그램에서만 시간 측정", v_wonly),
-                                          ("타자 소리 (Mechvibes 팩)", v_sound),
-                                          ("캐릭터 그림자", v_shadow),
-                                          ("타블렛 낙서 표시", v_trail),
-                                          ("항상 위에 표시", v_top)], start=7):
+        v_autostart = tk.BooleanVar(value=bool(self.us.get("autostart", True)))
+        checks = [("작업 타이머 표시", v_timer),
+                  ("작업 프로그램에서만 시간 측정", v_wonly),
+                  ("타자 소리 (Mechvibes 팩)", v_sound),
+                  ("캐릭터 그림자", v_shadow),
+                  ("타블렛 낙서 표시", v_trail),
+                  ("항상 위에 표시", v_top)]
+        if getattr(sys, "frozen", False):     # 자동 실행은 exe 배포본만 의미 있음
+            checks.append(("윈도우 시작 시 자동 실행", v_autostart))
+        rr = 7
+        for label, var in checks:
             tk.Checkbutton(frame, text=label, variable=var, bg=BG, fg=FG,
                            activebackground=BG, font=("Malgun Gothic", 9)
-                           ).grid(row=r, column=0, columnspan=2, sticky="w")
+                           ).grid(row=rr, column=0, columnspan=2, sticky="w")
+            rr += 1
         if self.sound_packs:
-            row(13, "타자 소리 팩")
+            row(rr, "타자 소리 팩"); rr += 1
             om = tk.OptionMenu(frame, v_pack, *self.sound_packs)
             om.configure(bg="#ffffff", font=("Malgun Gothic", 8),
                          relief="flat", highlightthickness=1)
-            om.grid(row=14, column=0, columnspan=2, sticky="we", pady=(0, 2))
-        row(15, "작업 프로그램 (쉼표 구분)")
+            om.grid(row=rr, column=0, columnspan=2, sticky="we", pady=(0, 2))
+            rr += 1
+        row(rr, "작업 프로그램 (쉼표 구분)"); rr += 1
         tk.Entry(frame, textvariable=v_apps, width=26,
-                 font=("Malgun Gothic", 8)).grid(row=16, column=0, columnspan=2,
+                 font=("Malgun Gothic", 8)).grid(row=rr, column=0, columnspan=2,
                                                  sticky="we", pady=(0, 2))
-
+        rr += 1
         info = tk.Label(frame, text="크기·타이머·그림자 변경은 저장 시 재시작됩니다",
                         bg=BG, fg="#b0a3ab", font=("Malgun Gothic", 8))
-        info.grid(row=17, column=0, columnspan=2, pady=(8, 2))
+        info.grid(row=rr, column=0, columnspan=2, pady=(8, 2))
+        rr += 1
+        self._settings_save_row = rr
 
         def save():
             try:
@@ -1437,7 +1449,8 @@ class Mascot:
                        "sound": bool(v_sound.get()),
                        "sound_volume": max(0, min(100, int(v_vol.get()))),
                        "pen_volume": max(0, min(100, int(v_pen.get()))),
-                       "sound_pack": v_pack.get()}
+                       "sound_pack": v_pack.get(),
+                       "autostart": bool(v_autostart.get())}
             except Exception:
                 return
             need_restart = (new["scale_pct"] != self.us["scale_pct"]
@@ -1449,6 +1462,7 @@ class Mascot:
             self.idle_thr = self.us["idle_sec"]
             self.root.attributes("-topmost", bool(self.us["topmost"]))
             self._init_sound()
+            self._apply_autostart()
             win.destroy()
             if need_restart:
                 self._restart()
@@ -1456,12 +1470,33 @@ class Mascot:
         tk.Button(frame, text="저장", command=save, width=10,
                   bg=CARD_BORDER, fg="#5b3a44", relief="flat",
                   font=("Malgun Gothic", 9, "bold")).grid(
-            row=18, column=0, columnspan=2, pady=(6, 0))
+            row=self._settings_save_row, column=0, columnspan=2, pady=(6, 0))
 
     def _save_settings(self):
         try:
             with open(self.settings_path, "w", encoding="utf-8") as fp:
                 json.dump(self.us, fp, ensure_ascii=False, indent=1)
+        except Exception:
+            pass
+
+    def _apply_autostart(self):
+        """윈도우 시작 시 자동 실행 등록/해제 (exe 배포본만, HKCU Run 키, 관리자 불필요)."""
+        if not getattr(sys, "frozen", False):
+            return                       # 소스 실행(로컬)에서는 의미 없음
+        try:
+            import winreg
+            name = os.path.splitext(os.path.basename(sys.executable))[0]
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                                r"Software\Microsoft\Windows\CurrentVersion\Run",
+                                0, winreg.KEY_SET_VALUE) as key:
+                if self.us.get("autostart", True):
+                    winreg.SetValueEx(key, name, 0, winreg.REG_SZ,
+                                      f'"{sys.executable}"')
+                else:
+                    try:
+                        winreg.DeleteValue(key, name)
+                    except FileNotFoundError:
+                        pass
         except Exception:
             pass
 
