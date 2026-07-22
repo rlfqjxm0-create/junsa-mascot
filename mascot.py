@@ -501,6 +501,27 @@ class Mascot:
 
         self._tw_cache = {}          # 상태 텍스트 폭 캐시 (캔버스로 측정)
 
+        # ── 귀여운 이벤트 (선물 캐릭터 전용 — config의 "fun") ────────────
+        self.fun = bool(self.cfg.get("fun"))
+        self.bubble = None           # (텍스트, 사라질 시각)
+        self.particles = []          # 폭죽 조각 [x, y, vx, vy, 색, 수명]
+        self.hat_until = 0.0         # 고깔모자 표시 종료 시각
+        self.smile_until = 0.0       # 웃는 표정 종료 시각
+        self.celebrate_until = 0.0   # 축하 연출 종료 시각
+        self._pet_drawn = []         # 이번 프레임에 그린 반려동물 (그림자용)
+        self._pet_sh_cache = {}
+        self._pet_sh_on = False
+        self._pet_sh_t = 0.0
+        self.click_bounce = 0.0      # 클릭 반응 튀어오름 종료 시각
+        self.pet_t0 = 0.0            # 반려동물 등장 시작(0=쉬는 중)
+        _now = time.time()
+        self.next_talk = _now + random.uniform(90, 200)
+        self.next_pet = _now + random.uniform(30, 80)   # 첫 인사는 좀 이르게
+        # 하루 브리핑용 집계
+        self.stat = {"work": 0.0, "other": 0.0, "idle": 0.0, "keys": 0,
+                     "strokes": 0, "best": 0.0, "_run": 0.0,
+                     "first": 0.0, "last": 0.0}
+
         self._load_parts()
 
         # ── 상태 ──────────────────────────────────────────────────────────
@@ -619,7 +640,8 @@ class Mascot:
         self.has = {}
         pil_cache = {}
         for name in ("body_open", "pupils", "body_mask", "lashes", "hair",
-                     "eyes_closed", "head", "desk", "arm_pen"):
+                     "eyes_closed", "head", "desk", "arm_pen",
+                     "smile", "pet1", "pet2"):
             # 파일과 layout 위치가 둘 다 있어야 사용 (자동업데이트 섞임 대비)
             self.has[name] = (os.path.exists(os.path.join(self.dir, f"{name}.png"))
                               and name in self.layout)
@@ -629,10 +651,29 @@ class Mascot:
 
         # 타이머 카드 가로 중심 = 책상 내용의 중심 (캔버스 중심이 아니라)
         self.card_cx = self.W / 2
+        self._desk_top = self.H * 0.6        # 반려동물이 올라오는 기준선
         if "desk" in pil_cache:
             bb = pil_cache["desk"].split()[3].getbbox()
             if bb:
                 self.card_cx = (bb[0] + bb[2]) / 2
+                self._desk_top = bb[1]
+
+        self._build_pet_mask(pil_cache)
+        self._load_hat(pil_cache)
+
+        # 잘 때 머리를 기울이는 축 = 목 (머리 가로 중심 · 몸통 윗선)
+        self._tilt_cache = {}
+        self._tilt_max = 0.0
+        base = "head" if self.has.get("head") else "body_open"
+        hb = pil_cache[base].split()[3].getbbox()
+        hx, hy = self.layout[base]["pos"]
+        # 머리(없으면 몸통) 실루엣 상자 — zzZ 위치·기울임 축의 기준
+        self._head_box = ((hx * s + hb[0], hy * s + hb[1],
+                           hx * s + hb[2], hy * s + hb[3]) if hb else
+                          (0, 0, self.W, self.H))
+        if self.has.get("head"):
+            self._neck = ((self._head_box[0] + self._head_box[2]) / 2,
+                          self.layout["body_open"]["pos"][1] * s + 6)
 
         # 회전 손 파츠: 어깨(최상단) 앵커 기준으로 회전 — 어깨가 몸에서 안 떨어짐
         self.hop = {}
@@ -657,8 +698,183 @@ class Mascot:
         self._pil_cache = {n: pil_cache[n] for n in pil_cache}
         self._load_pil = load_pil
 
+        if self.has.get("head"):
+            self._build_tilt_base()     # 잘 때 기울이는 머리 한 장 + 최대 각도
+
         self._bake_oy()                 # oy 의존 좌표 계산
         self._build_shadow_img()        # 그림자 이미지 생성
+
+    def _load_hat(self, pil_cache):
+        """축하용 고깔모자 — 머리 폭에 맞춰 줄이고 살짝 기울여 둔다."""
+        path = os.path.join(self.dir, "hat.png")
+        self.hat_anchor = (0, 0)
+        if not os.path.exists(path):
+            self.has["hat"] = False
+            return
+        base = "head" if self.has.get("head") else "body_open"
+        bb = pil_cache[base].split()[3].getbbox()
+        head_w = (bb[2] - bb[0]) if bb else self.W
+        im = Image.open(path).convert("RGBA")
+        k = head_w * float(self.cfg.get("hat_scale", 0.24)) / max(im.width, 1)
+        im = im.resize((max(8, round(im.width * k)), max(8, round(im.height * k))),
+                       Image.LANCZOS)
+        im = im.rotate(14, expand=True, resample=self._resample())
+        self.im["hat"] = ImageTk.PhotoImage(self._hard(im))
+        self.has["hat"] = True
+
+    TILT_PAD = 70                    # 회전 여유 (잘려나가지 않게 캔버스를 넓혀 합성)
+
+    def _build_tilt_base(self):
+        """머리+얼굴 파츠를 한 장으로 합쳐 두고, 창을 안 벗어나는 최대 각도를 구한다."""
+        p = self.TILT_PAD
+        layer = Image.new("RGBA", (self.W + 2 * p, self.H + 2 * p), (0, 0, 0, 0))
+
+        def paste(name):
+            x, y = self.layout[name]["pos"]
+            layer.alpha_composite(self._pil_cache[name],
+                                  (round(x * self.s) + p, round(y * self.s) + p))
+
+        paste("head")
+        for name in (self.layout.get("overlays") or ["eyes_closed", "hair"]):
+            if name in ("body_mask", "head") or not self.has.get(name):
+                continue
+            paste(name)
+        self._tilt_base = layer
+        self._tilt_max = 0.0
+        # 실제로 돌려 보고, 창 밖으로 8px 이내로만 밀리는 최대 각도를 고른다
+        for deg in (8, 7, 6, 5, 4, 3, 2):
+            if abs(self._tilt_fit(self._rot_head(-deg))) <= 8:
+                self._tilt_max = float(deg)
+                break
+
+    def _rot_head(self, deg):
+        p = self.TILT_PAD
+        return self._tilt_base.rotate(deg, center=(self._neck[0] + p,
+                                                   self._neck[1] + p),
+                                      resample=self._resample())
+
+    def _tilt_fit(self, im):
+        """돌린 머리가 창 안에 들어오도록 좌우로 밀어야 할 픽셀 수."""
+        p = self.TILT_PAD
+        bb = im.split()[3].getbbox()
+        if not bb:
+            return 0
+        return max((p + 2) - bb[0], 0) - max(bb[2] - (p + self.W - 2), 0)
+
+    def _sleep_head(self, deg):
+        """잘 때 기울어진 머리 — (이미지, 창 안으로 미는 보정값), 1도 단위 캐시."""
+        key = round(deg)
+        hit = self._tilt_cache.get(key)
+        if hit is not None:
+            return hit
+        if len(self._tilt_cache) > 24:
+            self._tilt_cache.clear()
+        layer = self._rot_head(key)
+        dx = max(-12, min(12, self._tilt_fit(layer)))
+        hit = (ImageTk.PhotoImage(self._hard(layer)), dx)
+        self._tilt_cache[key] = hit
+        return hit
+
+    def _tilt_xy(self, x, y, deg):
+        """목을 축으로 deg만큼 돈 뒤의 좌표 (콧방울 따라가기용)."""
+        a = math.radians(deg)
+        nx, ny = self._neck
+        dx, dy = x - nx, y - ny
+        return (nx + dx * math.cos(a) - dy * math.sin(a),
+                ny + dx * math.sin(a) + dy * math.cos(a))
+
+    def _draw_snot(self, now, yo, deg, tdx=0):
+        """자는 동안 코에서 부풀었다 꺼지는 콧방울."""
+        nose = self.cfg.get("nose")
+        if not nose:
+            return
+        t = now % 5.2
+        if t < 3.8:
+            r = 2.0 + 11.0 * (t / 3.8) ** 1.6
+        elif t < 4.05:
+            r = 13.0 * (1 - (t - 3.8) / 0.25)      # 픽 하고 꺼짐
+        else:
+            return
+        if r < 1.5:
+            return
+        x, y = nose[0] * self.s, nose[1] * self.s
+        x, y = self._tilt_xy(x, y, -deg)           # 캔버스 좌표는 회전 방향 반대
+        x += tdx
+        y += self.oy + yo
+        c = self.canvas
+        cx, cy = x + r * 0.15, y + r * 0.85
+        c.create_oval(cx - r, cy - r, cx + r, cy + r,
+                      fill="#dfeeff", outline="#8dbfe4", width=2)
+        c.create_oval(cx - r * 0.55, cy - r * 0.6, cx - r * 0.05, cy - r * 0.1,
+                      fill="#ffffff", outline="")
+
+    def _build_pet_mask(self, pil_cache):
+        """반려동물이 '책상 뒤'에 있도록, 열마다 책상 윗선 위쪽만 남기는 마스크."""
+        self._pet_cache = {}
+        self._pet_hide = {}
+        self.pet_cast = []
+        if not (self.has.get("pet1") or self.has.get("pet2")):
+            self._pet_mask = None
+            return
+        desk = pil_cache["desk"]
+        W, H = desk.size
+        alpha = desk.split()[3].point(lambda v: 255 if v > 40 else 0)
+        tops = []
+        for x in range(W):                       # 열별 책상 최상단 행
+            bb = alpha.crop((x, 0, x + 1, H)).getbbox()
+            tops.append(bb[1] if bb else None)
+        last = H
+        for x in range(W):                       # 책상이 없는 열은 이웃 값으로
+            if tops[x] is None:
+                tops[x] = last
+            else:
+                last = tops[x]
+        last = H
+        for x in range(W - 1, -1, -1):
+            if tops[x] == H:
+                tops[x] = last
+            else:
+                last = tops[x]
+        mask = Image.new("L", (W, H), 0)
+        col = Image.new("L", (1, H), 255)
+        for x, t in enumerate(tops):
+            if t > 0:
+                mask.paste(col.crop((0, 0, 1, t)), (x, 0))
+        self._pet_mask = mask
+        self._pet_xy = {}
+        k = float(self.cfg.get("pet_scale", 1.3))
+        for name in ("pet1", "pet2"):
+            if not self.has.get(name):
+                continue
+            small = pil_cache[name]
+            rot = float(self.cfg.get("pet_rot", 0))
+            if k != 1.0 or rot:                  # 원본에서 다시 줄여야 안 뭉갠다
+                src = Image.open(os.path.join(self.dir, f"{name}.png")).convert("RGBA")
+                big = src.resize((max(1, round(src.width * self.s * k)),
+                                  max(1, round(src.height * self.s * k))),
+                                 Image.LANCZOS)
+                if rot:                          # 캐릭터 뒤에서 안 가리게 기울이기
+                    big = big.rotate(rot, expand=True, resample=self._resample())
+                bb = big.split()[3].getbbox()    # 회전으로 생긴 빈 여백은 잘라낸다
+                if bb:
+                    big = big.crop(bb)
+                pil_cache[name] = big = self._hard(big)
+            else:
+                big = small
+            px, py = self.layout[name]["pos"]
+            px, py = px * self.s, py * self.s
+            # 원래 실루엣의 밑변 중심을 기준으로 커지고 기울어지게
+            sb = small.split()[3].getbbox() or (0, 0, small.width, small.height)
+            ax, ay = px + (sb[0] + sb[2]) / 2, py + sb[3]
+            px = round(ax - big.width / 2) + int(self.cfg.get("pet_dx", 0))
+            py = round(ay - big.height)
+            px = max(2, min(px, self.W - big.width - 2))   # 창 밖으로 안 나가게
+            self._pet_xy[name] = (px, py)
+            # 모든 열에서 책상 윗선 아래로 내려가면 완전히 사라진다
+            need = max(tops[min(max(px + j, 0), W - 1)]
+                       for j in range(big.width)) - py
+            self._pet_hide[name] = max(need + 4, 10)
+
 
     def _timer_oy(self):
         """타이머 카드가 차지하는 캐릭터 위 여백."""
@@ -666,7 +882,7 @@ class Mascot:
             return 0
         if self.has_clock:
             return OY_CLOCK_OPEN if self.clock_open else OY_CLOCK_COMPACT
-        return TIMER_H
+        return TIMER_H + (26 if self.cfg.get("fun") else 0)  # 종료 버튼 자리
 
     def _bake_oy(self):
         """oy(카드 높이)에 의존하는 좌표들 — 시계 토글로 oy가 바뀌면 다시 부른다."""
@@ -731,7 +947,7 @@ class Mascot:
         elif self.has_clock:
             w, h = 196, 40
         else:
-            w, h = 200, 62
+            w, h = 200, (88 if self.cfg.get("fun") else 62)
         x0 = getattr(self, "card_cx", self.W / 2) - w / 2
         y0 = 22
         return {"x0": x0, "y0": y0, "x1": x0 + w, "y1": y0 + h, "w": w, "h": h}
@@ -815,6 +1031,8 @@ class Mascot:
         # 소리 억제 (브러시 크기·화면 회전 돌릴 때 키보드 소리 안 나게)
         dial = (now - self._key_times.get(k, 0)) < 0.09
         self._key_times[k] = now
+        if first and not dial:
+            self.stat["keys"] = self.stat.get("keys", 0) + 1
         sp = self.sndpack
         if first and not dial and sp is not None:
             try:
@@ -851,12 +1069,25 @@ class Mascot:
         self.root.geometry(f"+{e.x_root - px}+{e.y_root - py}")
 
     def _on_release(self, e):
-        if self._press is not None and not self._dragged and self.has_clock:
+        if self._press is not None and not self._dragged:
             px, py, _, _ = self._press
             g = self._card_geom()
-            if g["x0"] <= px <= g["x1"] and g["y0"] - 17 <= py <= g["y1"]:
+            on_card = (g["x0"] <= px <= g["x1"] and g["y0"] - 17 <= py <= g["y1"])
+            btn = getattr(self, "_end_btn", None)
+            if self.fun and btn and btn[0] <= px <= btn[2] and btn[1] <= py <= btn[3]:
+                self._celebrate()                      # 작업 종료 버튼
+            elif self.has_clock and on_card:
                 self._toggle_clock()
+            elif self.fun and not on_card and py > self.oy:
+                self._on_poke()                        # 캐릭터를 콕 찌름
         self._press = None
+
+    def _on_poke(self):
+        """캐릭터 클릭 반응 — 콩 튀고 한마디. (반응 파츠는 나중에 교체 가능)"""
+        now = time.time()
+        self.click_bounce = now + 0.45
+        self.squash_until = now + 0.12
+        self._say(random.choice(self.CLICK_TALK), 2.2)
 
     def _toggle_clock(self):
         """시계 펼침/접힘 — 창 높이를 바꾸고(아래 고정) 좌표·그림자 재계산."""
@@ -892,13 +1123,17 @@ class Mascot:
             with open(self.state_path, encoding="utf-8") as fp:
                 st = json.load(fp)
             self.work_secs = float(st.get("seconds", 0))
+            saved = st.get("stat")
+            if isinstance(saved, dict):
+                self.stat.update({k: saved.get(k, v) for k, v in self.stat.items()})
         except Exception:
             pass
 
     def _timer_save(self):
         try:
             with open(self.state_path, "w", encoding="utf-8") as fp:
-                json.dump({"seconds": round(self.work_secs)}, fp)
+                json.dump({"seconds": round(self.work_secs),
+                           "stat": self.stat}, fp)
         except Exception:
             pass
 
@@ -946,6 +1181,17 @@ class Mascot:
         else:
             state = "work"
             self.work_secs += dt
+        # 하루 브리핑용 집계 (작업/딴짓/휴식 시간, 최장 집중 구간, 시작·마지막)
+        s = self.stat
+        s[state] = s.get(state, 0.0) + dt
+        if state == "work":
+            s["_run"] = s.get("_run", 0.0) + dt
+            s["best"] = max(s.get("best", 0.0), s["_run"])
+            if not s.get("first"):
+                s["first"] = now
+            s["last"] = now
+        else:
+            s["_run"] = 0.0
         if now - self._t_save > 30:
             self._t_save = now
             self._timer_save()
@@ -1060,6 +1306,350 @@ class Mascot:
         hand(lt.tm_sec / 60, R * 0.76, 1, cd["fill"])
         c.create_oval(cx - 2.5, cy - 2.5, cx + 2.5, cy + 2.5, fill=cd["fill"], outline="")
 
+    # ── 귀여운 이벤트: 말풍선 · 혼잣말 · 클릭 반응 · 반려동물 · 축하 ──────
+    PET_RISE, PET_HOLD, PET_FALL = 0.5, 6.0, 0.5
+    TALK = [
+        "히히", "바보!", "배고파요", "조금만 더 힘내자!", "뭐 좀 먹고 할까...",
+        "야옹", "싫어 그 가느다란 꼬리", "사탄 참 좋다", "가즈아", "야르",
+        "졸려", "심심해", "오늘도 화이팅!", "집중! 집중!", "손이 멈췄다?",
+        "그림 그리자!", "저장했지?", "Ctrl+S!", "커피 한 잔?", "조금만 더!",
+        "쉬엄쉬엄 하자.", "손목 괜찮아?", "한 장만 더!", "끝내고 놀자!",
+        "영혼을 바쳐라.", "몰?루", "오늘도 평화롭다.", "좋은 하루!",
+        "기분 최고!", "운세 좋음!", "행운 냥!", "행복 충전!", "산책은 싫어.",
+        "창밖이 궁금해.", "햇빛이다!", "꾸벅...", "후암~", "멍...", "어라?",
+        "오?", "흠...", "비밀이야.", "쉿!", "냥냥펀치!", "히힛!",
+        "간식은 언제?",
+    ]
+    CLICK_TALK = TALK
+
+    def _say(self, text, secs=4.0):
+        self.bubble = (text, time.time() + secs)
+
+    def _talk_pool(self, state):
+        return self.TALK
+
+    def _fun_tick(self, now, state, sleeping):
+        """혼잣말·반려동물 스케줄과 폭죽 물리 (매 프레임)."""
+        if not self.fun:
+            return
+        if self.bubble and now > self.bubble[1]:
+            self.bubble = None
+        if (self.bubble is None and now >= self.next_talk
+                and not sleeping and now > self.celebrate_until):
+            self._say(random.choice(self._talk_pool(state)))
+            self.next_talk = now + random.uniform(150, 420)
+        # 반려동물 등장/퇴장
+        total = self.PET_RISE + self.PET_HOLD + self.PET_FALL
+        if self.pet_t0 == 0.0 and now >= self.next_pet and not sleeping:
+            self.pet_cast = self._pick_pets()
+            self.pet_t0 = now if self.pet_cast else 0.0
+            if not self.pet_cast:
+                self.next_pet = now + 999999
+        elif self.pet_t0 and now - self.pet_t0 > total + 0.4:
+            self.pet_t0 = 0.0
+            self.next_pet = now + random.uniform(240, 600)
+        # 폭죽 입자 (중력 + 수명)
+        if self.particles:
+            alive = []
+            for p in self.particles:
+                p[0] += p[2]
+                p[1] += p[3]
+                p[3] += 0.35
+                p[5] -= 1
+                if p[5] > 0 and p[1] < self.H + 30:
+                    alive.append(p)
+            self.particles = alive
+
+    def _pick_pets(self):
+        """이번에 나올 반려동물 배역 — 2마리면 한 마리씩 또는 둘 다."""
+        names = [n for n in ("pet1", "pet2") if self.has.get(n)]
+        if len(names) < 2:
+            return [(n, 0.0) for n in names]
+        pick = random.choice([[names[0]], [names[1]], names])
+        return [(n, i * 0.35) for i, n in enumerate(pick)]
+
+    def _pet_img(self, name, dy):
+        """책상 윗선 아래는 잘라낸 반려동물 이미지 (내려간 만큼 가려짐)."""
+        key = (name, int(dy))
+        hit = self._pet_cache.get(key)
+        if hit is None:
+            if len(self._pet_cache) > 120:
+                self._pet_cache.clear()
+            pil = self._pil_cache[name]
+            x0, y0 = self._pet_xy[name]
+            y0 = y0 + dy
+            region = self._pet_mask.crop((x0, y0, x0 + pil.width, y0 + pil.height))
+            blank = Image.new("RGBA", pil.size, (0, 0, 0, 0))
+            hit = ImageTk.PhotoImage(Image.composite(pil, blank, region))
+            self._pet_cache[key] = hit
+        return hit
+
+    PET_BLUR = 16                    # 반려동물 그림자 블러 여백
+
+    def _pet_shadow_pil(self, name, dy):
+        """반려동물 그림자(책상선까지 잘린 실루엣을 흐린 것) — dy별 캐시."""
+        key = (name, int(dy))
+        hit = self._pet_sh_cache.get(key)
+        if hit is None:
+            from PIL import ImageFilter
+            if len(self._pet_sh_cache) > 40:
+                self._pet_sh_cache.clear()
+            pil = self._pil_cache[name]
+            x0, y0 = self._pet_xy[name]
+            region = self._pet_mask.crop((x0, y0 + dy, x0 + pil.width,
+                                          y0 + dy + pil.height))
+            blank = Image.new("RGBA", pil.size, (0, 0, 0, 0))
+            cut = Image.composite(pil, blank, region)
+            b = self.PET_BLUR
+            pad = Image.new("L", (pil.width + 2 * b, pil.height + 2 * b), 0)
+            pad.paste(cut.getchannel("A"), (b, b))
+            a = pad.filter(ImageFilter.GaussianBlur(7)).point(lambda v: int(v * 0.30))
+            black = Image.new("RGB", pad.size, (0, 0, 0))
+            hit = Image.merge("RGBA", (*black.split(), a))
+            self._pet_sh_cache[key] = hit
+        return hit
+
+    def _update_pet_shadow(self):
+        """반려동물이 나와 있는 동안만 그림자 창을 갱신 (약 15fps로 제한)."""
+        if self.shadow is None or self.shadow_img is None:
+            return
+        drawn = self._pet_drawn
+        now = time.time()
+        if not drawn:
+            if self._pet_sh_on:                  # 원래 그림자로 되돌린다
+                self.shadow.set_image(self.shadow_img)
+                self._pet_sh_on = False
+            return
+        if now - self._pet_sh_t < 0.065:
+            return
+        self._pet_sh_t = now
+        comp = self.shadow_img.copy()
+        b, sp = self.PET_BLUR, SHADOW_PAD
+        for name, dy, x, y in drawn:
+            comp.alpha_composite(self._pet_shadow_pil(name, dy),
+                                 (round(x) + sp - b, round(y) + sp - b))
+        self.shadow.set_image(comp)
+        self._pet_sh_on = True
+
+    def _draw_pet(self, now):
+        """책상 뒤에서 뿅 — 올라와 빤히 보다가 쏙 들어간다."""
+        if not (self.fun and self.pet_t0):
+            return
+        c = self.canvas
+        for name, delay in self.pet_cast:
+            t = now - self.pet_t0 - delay
+            if t < 0:
+                continue
+            if t < self.PET_RISE:
+                f = t / self.PET_RISE
+            elif t < self.PET_RISE + self.PET_HOLD:
+                f = 1.0
+            else:
+                f = max(0.0, 1.0 - (t - self.PET_RISE - self.PET_HOLD) / self.PET_FALL)
+            if f <= 0:
+                continue
+            f = f * f * (3 - 2 * f)                     # 부드럽게
+            x, y = self._pet_xy[name]
+            y += self.oy
+            if f >= 1.0:                                # 빤히 보는 동안 살짝 들썩
+                bob = math.sin((now + delay * 3) * 2.4) * 2.0
+                c.create_image(x, y - bob, image=self._pet_img(name, 0),
+                               anchor="nw")
+                self._pet_drawn.append((name, 0, x, y - bob))
+            else:
+                dy = round(self._pet_hide.get(name, 0) * (1 - f) / 3) * 3
+                c.create_image(x, y + dy, image=self._pet_img(name, dy),
+                               anchor="nw")
+                self._pet_drawn.append((name, dy, x, y + dy))
+
+
+    def _draw_hat(self, yo):
+        """축하용 고깔모자 (hat.png 있으면 사용, 없으면 임시 도형)."""
+        if not (self.fun and time.time() < self.hat_until):
+            return
+        c = self.canvas
+        name = "head" if self.has.get("head") else "body_open"
+        top = self._pos(name)[1] + yo
+        bb = self._pil_cache[name].split()[3].getbbox()
+        if bb:                          # 이미지 여백 제외한 실제 머리 꼭대기
+            top += bb[1]
+        dx, dy = self.cfg.get("hat_pos", [-44, 44])
+        hx = self.card_cx + dx          # 살짝 비껴 씌워 말풍선을 안 가리게
+        hat = self.im.get("hat")
+        if hat is not None:
+            c.create_image(hx, top + dy, image=hat, anchor="s")
+            return
+        c.create_polygon(hx - 19, top + 30, hx, top - 6, hx + 19, top + 30,
+                         fill="#ffb3c9", outline="#e07a9c", width=2)
+        c.create_oval(hx - 6, top - 16, hx + 6, top - 4,
+                      fill="#fff0a8", outline="#e0b84a", width=2)
+
+    def _draw_particles(self):
+        c = self.canvas
+        for x, y, _vx, _vy, col, _life in self.particles:
+            c.create_rectangle(x - 3, y - 2, x + 3, y + 2, fill=col, outline="")
+
+    @staticmethod
+    def _bubble_pts(x0, y0, x1, y1, r, tx, tw, th):
+        """둥근 사각형 + 아래쪽 V자 꼬리를 한 붓으로 이은 점 목록."""
+        pts = []
+
+        def arc(cx, cy, a0, a1, steps=6):
+            for i in range(steps + 1):
+                a = math.radians(a0 + (a1 - a0) * i / steps)
+                pts.extend((cx + math.cos(a) * r, cy + math.sin(a) * r))
+
+        arc(x1 - r, y0 + r, -90, 0)                 # 우상
+        arc(x1 - r, y1 - r, 0, 90)                  # 우하
+        pts.extend((tx + tw / 2, y1))               # 꼬리 시작
+        pts.extend((tx - tw * 0.18, y1 + th))       # 꼬리 끝
+        pts.extend((tx - tw / 2, y1))
+        arc(x0 + r, y1 - r, 90, 180)                # 좌하
+        arc(x0 + r, y0 + r, 180, 270)               # 좌상
+        return pts
+
+    def _draw_bubble(self, yo):
+        """머리 위 말풍선 — 둥근 모서리 + 아래 V자 꼬리."""
+        if not (self.fun and self.bubble):
+            return
+        text = self.bubble[0]
+        c, cd = self.canvas, self.card
+        w = max(self._text_w(text) + 34, 74)
+        h = 36
+        cx = self.card_cx
+        if time.time() < self.hat_until:      # 고깔모자를 가리지 않게 옆으로
+            cx += 42
+        cx = min(max(cx, w / 2 + 4), self.W - w / 2 - 4)   # 창 밖으로 안 나가게
+        top = self._pos("head" if self.has.get("head") else "body_open")[1] + yo
+        # 카드와 겹치지 않게 카드 아래로 (머리 위쪽에 걸침)
+        card_bottom = self._card_geom()["y1"] if self.timer_on else self.oy
+        by = max(top + 10, card_bottom + 40)
+        x0, x1 = cx - w / 2, cx + w / 2
+        pts = self._bubble_pts(x0, by - h, x1, by, 13, cx + 4, 17, 13)
+        c.create_polygon([p + 2 for p in pts], fill="#e6e2e8", outline="")
+        c.create_polygon(pts, fill="#ffffff", outline=cd["border"], width=2)
+        c.create_text(cx, by - h / 2, text=text,
+                      font=("Malgun Gothic", 9), fill=cd["text"])
+
+
+    def _celebrate(self):
+        """작업 종료 — 고깔모자 + 폭죽 + 축하 말풍선, 잠시 뒤 브리핑."""
+        now = time.time()
+        self.celebrate_until = now + 4.0
+        self.hat_until = now + 14.0
+        self.smile_until = now + 5.0            # 말풍선이 떠 있는 동안 웃는 얼굴
+        self._say("수고하셨습니다!", 5.0)
+        cols = ["#ff9ec4", "#ffd479", "#9ad7ff", "#b8e986", "#c9a7ff", "#ffa9a9"]
+        for _ in range(48):
+            ang = random.uniform(-2.7, -0.45)
+            spd = random.uniform(3.5, 8.5)
+            self.particles.append([self.card_cx + random.uniform(-70, 70),
+                                   self.oy + 46,
+                                   math.cos(ang) * spd, math.sin(ang) * spd,
+                                   random.choice(cols), random.randint(45, 85)])
+        self.root.after(1500, self._open_briefing)
+
+    def _open_briefing(self):
+        """오늘의 작업 브리핑 팝업."""
+        if getattr(self, "_brief_win", None) is not None \
+                and self._brief_win.winfo_exists():
+            self._brief_win.lift()
+            return
+        cd = self.card
+        s = self.stat
+        total = int(self.work_secs)
+        goal = max(float(self.us.get("goal_hours", 6)), 0.5) * 3600
+        pct = min(int(total / goal * 100), 999)
+
+        def hm(sec):
+            sec = int(sec)
+            return f"{sec // 3600}시간 {sec % 3600 // 60}분" if sec >= 3600 \
+                else f"{sec // 60}분"
+
+        def clock(ts):
+            return time.strftime("%H:%M", time.localtime(ts)) if ts else "-"
+
+        rows = [("총 작업 시간", hm(total)),
+                ("목표 달성", f"{pct}%  (목표 {self.us.get('goal_hours')}h)"),
+                ("최장 집중", hm(s.get("best", 0))),
+                ("시작 · 마지막", f"{clock(s.get('first'))} – {clock(s.get('last'))}"),
+                ("딴짓 / 휴식", f"{hm(s.get('other', 0))} / {hm(s.get('idle', 0))}"),
+                ("키 입력", f"{int(s.get('keys', 0)):,}회"),
+                ("그린 획", f"{int(s.get('strokes', 0)):,}획")]
+
+        W, PAD, ROW = 350, 22, 34
+        HEAD_H = 78
+        body_h = ROW * len(rows) + 20
+        H = 22 + HEAD_H + 22 + body_h + 26 + 42 + 24
+        win = tk.Toplevel(self.root)
+        self._brief_win = win
+        win.title("오늘의 작업")
+        win.attributes("-topmost", True)
+        win.resizable(False, False)
+        win.configure(bg="#fffdfe")
+        cv = tk.Canvas(win, width=W, height=H, bg="#fffdfe", highlightthickness=0)
+        cv.pack()
+
+        def rr(x0, y0, x1, y1, r, **kw):
+            pts = [x0 + r, y0, x1 - r, y0, x1, y0, x1, y0 + r, x1, y1 - r, x1, y1,
+                   x1 - r, y1, x0 + r, y1, x0, y1, x0, y1 - r, x0, y0 + r, x0, y0]
+            return cv.create_polygon(pts, smooth=True, **kw)
+
+        y = 22
+        rr(PAD, y, W - PAD, y + HEAD_H, 18, fill="#fdf4f8",
+           outline=cd["border"], width=2)
+        cv.create_text(W / 2, y + 30, text="오늘도 수고하셨어요!",
+                       font=("Malgun Gothic", 12, "bold"), fill=cd["text"])
+        cv.create_text(W / 2, y + 54, text=hm(total) + " 작업했어요",
+                       font=("Malgun Gothic", 9), fill=cd["sub"])
+        y += HEAD_H + 22
+
+        rr(PAD, y, W - PAD, y + body_h, 16, fill="#ffffff",
+           outline="#f0e6ec", width=1)
+        ry = y + 10 + ROW / 2
+        for i, (k, v) in enumerate(rows):
+            if i:
+                cv.create_line(PAD + 18, ry - ROW / 2, W - PAD - 18, ry - ROW / 2,
+                               fill="#f6eef4")
+            cv.create_text(PAD + 18, ry, anchor="w", text=k,
+                           font=("Malgun Gothic", 9), fill=cd["sub"])
+            cv.create_text(W - PAD - 18, ry, anchor="e", text=v,
+                           font=("Malgun Gothic", 9, "bold"), fill=cd["text"])
+            ry += ROW
+        y += body_h + 26
+
+        def reset_and_close():
+            self.work_secs = 0.0
+            for k in ("work", "other", "idle", "best", "_run", "first", "last"):
+                self.stat[k] = 0.0
+            self.stat["keys"] = self.stat["strokes"] = 0
+            self._timer_save()
+            win.destroy()
+
+        gap = 12
+        bw = (W - PAD * 2 - gap) / 2
+        b1 = (PAD, y, PAD + bw, y + 42)
+        b2 = (PAD + bw + gap, y, W - PAD, y + 42)
+        rr(*b1, 16, fill="#f4f1f5", outline="")
+        cv.create_text((b1[0] + b1[2]) / 2, y + 21, text="새로 시작",
+                       font=("Malgun Gothic", 10, "bold"), fill=cd["sub"])
+        rr(*b2, 16, fill=cd["fill"], outline="")
+        cv.create_text((b2[0] + b2[2]) / 2, y + 21, text="닫기",
+                       font=("Malgun Gothic", 10, "bold"), fill="#ffffff")
+
+        def on_click(e):
+            if b1[0] <= e.x <= b1[2] and b1[1] <= e.y <= b1[3]:
+                reset_and_close()
+            elif b2[0] <= e.x <= b2[2] and b2[1] <= e.y <= b2[3]:
+                win.destroy()
+        cv.bind("<Button-1>", on_click)
+        win.update_idletasks()
+        sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+        px = min(max(self.root.winfo_rootx() - 40, 10), max(sw - W - 10, 10))
+        py = min(max(self.root.winfo_rooty() - 20, 10), max(sh - H - 60, 10))
+        win.geometry(f"+{int(px)}+{int(py)}")
+
+
     def _draw_timer(self, state, sleeping, now):
         c = self.canvas
         cd = self.card
@@ -1122,9 +1712,44 @@ class Mascot:
             c.create_text(x1 - pad, row2, anchor="e", text=f"{int(frac * 100)}%",
                           font=("Malgun Gothic", 7, "bold"),
                           fill="#5aa86e" if frac >= 1.0 else cd["sub"])
+            if self.fun:                      # 작업 종료 버튼
+                bw = 104
+                bx = (x0 + x1) / 2
+                by = y1 - 22
+                r = (bx - bw / 2, by - 11, bx + bw / 2, by + 11)
+                self._rrect(*r, 11, fill=cd["fill"], outline="")
+                c.create_text(bx, by, text="작업 종료",
+                              font=("Malgun Gothic", 8, "bold"), fill="#ffffff")
+                self._end_btn = r
 
     # ── 매 프레임 갱신 (~30fps) ──────────────────────────────────────────
+    def _log_error(self, where):
+        """한 프레임이 터져도 프로그램은 계속 돌게 — 원인은 파일로 남긴다."""
+        self._err_count = getattr(self, "_err_count", 0) + 1
+        if self._err_count > 20:
+            return
+        try:
+            import traceback
+            with open(os.path.join(self.state_dir, ".error.log"), "a",
+                      encoding="utf-8") as fp:
+                fp.write(f"\n===== {time.strftime('%Y-%m-%d %H:%M:%S')} {where}\n")
+                traceback.print_exc(file=fp)
+        except Exception:
+            pass
+
     def tick(self):
+        # 다음 프레임을 먼저 예약한다 — 중간에 예외가 나도 루프가 죽지 않게
+        self.root.after(33, self.tick)
+        try:
+            self._tick_body()
+        except Exception:
+            self._log_error("tick")
+            try:
+                self.draw(time.time())      # 지워진 화면을 다시 채운다
+            except Exception:
+                self._log_error("redraw")
+
+    def _tick_body(self):
         now = time.time()
         if self.key_events != self._seen_keys:
             self._seen_keys = self.key_events
@@ -1156,7 +1781,6 @@ class Mascot:
             except Exception:
                 pass
         self.draw(now)
-        self.root.after(33, self.tick)
 
     def _quad_xy(self, u, v):
         (tlx, tly), (trx, try_), (brx, bry), (blx, bly) = self.quad
@@ -1199,6 +1823,9 @@ class Mascot:
             breathe = math.sin(now * 2.0) * 1.5
         squash = 3 if now < self.squash_until else 0
         yo = breathe + squash
+        if self.fun and now < self.click_bounce:      # 클릭 반응: 콩 하고 튐
+            t = (self.click_bounce - now) / 0.45
+            yo -= math.sin(t * math.pi) * 7
 
         cx, cy = cursor_pos()
         wx = self.root.winfo_rootx() + self.W // 2
@@ -1212,28 +1839,36 @@ class Mascot:
 
         blinking = (sleeping or now < self.blink_until or f.get("blink", False)) \
             and (self.blink_cfg is not None or self.has.get("eyes_closed"))
+        smiling = bool(self.has.get("smile")
+                       and (now < self.smile_until or f.get("smile", False)))
+        if smiling:
+            blinking = False
 
+        self._pet_drawn = []
+        state = self._timer_tick(now, idle) if self.timer_on else "idle"
+        try:                            # 귀여운 연출이 캐릭터를 못 지우게 격리
+            self._fun_tick(now, state, sleeping)
+        except Exception:
+            self._log_error("fun_tick")
         if self.timer_on:
-            self._draw_timer(self._timer_tick(now, idle), sleeping, now)
+            self._draw_timer(state, sleeping, now)
 
         # ── 몸 (+머리 없는 캐릭터는 여기서 얼굴까지) ─────────────────────
         # 개는 머리를 팔 위에 그려야 어깨가 안 튀어나오므로, 얼굴을 팔 뒤로 미룬다.
         bx, by = self._pos("body_open")
         c.create_image(bx, by + yo, image=self.im["body_open"], anchor="nw")
+        head_early = self.cfg.get("arms_over_head") and self.has.get("head")
         if not self.has.get("head"):
-            self._draw_face(yo, pdx, pdy, blinking)
+            self._draw_face(yo, pdx, pdy, blinking, smiling)
+        elif head_early:                # 준사: 책상·팔이 머리 위 (PSD 레이어 순서)
+            self._draw_head(now, yo, pdx, pdy, blinking, smiling, sleeping)
 
-        # 수면 모드: 머리 옆에 둥실거리는 zzZ
-        if sleeping:
-            bw = self.layout["body_open"]["size"][0] * self.s
-            zx, zy = bx + bw * 0.86, by + yo + 26
-            for i, (dx, dy, size, color) in enumerate((
-                    (0, 24, 10, "#aab7cc"),
-                    (14, 6, 13, "#93a4c2"),
-                    (30, -14, 16, "#7c90b5"))):
-                bob = math.sin(now * 1.6 + i * 0.9) * 3
-                c.create_text(zx + dx, zy + dy + bob, text="z" if i == 0 else "Z",
-                              font=("Malgun Gothic", size, "bold"), fill=color)
+        # 반려동물은 책상 바로 앞(=책상에 가려지게) 그린다
+        if not self.cfg.get("pet_front"):
+            try:
+                self._draw_pet(now)
+            except Exception:
+                self._log_error("draw_pet")
 
         # ── 책상 (+옵션: 화면 낙서) ──────────────────────────────────────
         c.create_image(*self._pos("desk"), image=self.im["desk"], anchor="nw")
@@ -1252,6 +1887,13 @@ class Mascot:
                                   outline="")
         else:
             self.strokes = []
+
+        # 앞으로 나오는 반려동물: 얼굴 위 · 팔 아래 (책상선 마스크는 그대로)
+        if self.cfg.get("pet_front"):
+            try:
+                self._draw_pet(now)
+            except Exception:
+                self._log_error("draw_pet")
 
         # ── 오른손/오른팔: 펜 추적 또는 타이핑 파츠(어깨 축 회전) ────────
         if pen_typing and "pen" not in f:
@@ -1277,6 +1919,9 @@ class Mascot:
             self._pen_xy[0] += (target[0] - self._pen_xy[0]) * 0.55
             self._pen_xy[1] += (target[1] - self._pen_xy[1]) * 0.55
             tx, ty = self._pen_xy
+            if drawing and not getattr(self, "_stroke_prev", False):
+                self.stat["strokes"] = self.stat.get("strokes", 0) + 1
+            self._stroke_prev = drawing
             if drawing:
                 if self._new_stroke or not self.strokes:
                     self.strokes.append([])
@@ -1311,14 +1956,72 @@ class Mascot:
 
         # ── 머리(팔 위) + 얼굴 — 개처럼 머리를 분리한 캐릭터 ──────────────
         # 머리를 팔보다 위에 그려 어깨가 머리 밖으로 튀어나오지 않게 한다.
-        if self.has.get("head"):
+        if self.has.get("head") and not head_early:
+            self._draw_head(now, yo, pdx, pdy, blinking, smiling, sleeping)
+
+        # 수면 모드: 머리 위쪽에 둥실거리는 zzZ (머리보다 위에 그린다)
+        if sleeping:
+            hx0, hy0, hx1, hy1 = self._head_box
+            zx = min(hx1 - 14, self.W - 42)
+            zy = hy0 + self.oy + yo + 10
+            for i, (dx, dy, size, color) in enumerate((
+                    (0, 22, 10, "#aab7cc"),
+                    (13, 4, 13, "#93a4c2"),
+                    (28, -16, 16, "#7c90b5"))):
+                bob = math.sin(now * 1.6 + i * 0.9) * 3
+                c.create_text(zx + dx, zy + dy + bob, text="z" if i == 0 else "Z",
+                              font=("Malgun Gothic", size, "bold"), fill=color)
+
+        # ── 귀여운 연출: 고깔모자 → 폭죽 → 말풍선 (맨 위) ────────────────
+        if self.fun:
+            try:
+                self._draw_hat(yo)
+                self._draw_particles()
+                self._draw_bubble(yo)
+            except Exception:
+                self._log_error("fun_draw")
+
+        try:                            # 반려동물 그림자 (나와 있을 때만)
+            self._update_pet_shadow()
+        except Exception:
+            self._log_error("pet_shadow")
+
+    def _draw_head(self, now, yo, pdx, pdy, blinking, smiling, sleeping):
+        """머리 + 얼굴 (자는 중이면 목을 축으로 기울인 합성본)."""
+        c = self.canvas
+        if sleeping and self._tilt_max >= 2:       # 꾸벅 — 살짝 기울여 잔다
+            m = self._tilt_max
+            tilt = -(m * 0.78 + m * 0.22 * math.sin(now * 0.55))
+            p = self.TILT_PAD
+            img, tdx = self._sleep_head(tilt)
+            c.create_image(tdx - p, self.oy - p + yo, anchor="nw", image=img)
+            self._draw_snot(now, yo, tilt, tdx)
+        else:
             hx, hy = self._pos("head")
             c.create_image(hx, hy + yo, image=self.im["head"], anchor="nw")
-            self._draw_face(yo, pdx, pdy, blinking)
+            self._draw_face(yo, pdx, pdy, blinking, smiling)
 
-    def _draw_face(self, yo, pdx, pdy, blinking):
-        """눈동자(시선) 또는 감은 눈 + 눈 위 덮개들."""
+    def _draw_face(self, yo, pdx, pdy, blinking, smiling=False):
+        """눈동자(시선) 또는 감은 눈/웃는 얼굴 + 눈 위 덮개들."""
         c = self.canvas
+        if smiling:                       # 웃는 표정 파츠가 눈을 대신한다
+            drawn = False
+            for name in (self.layout.get("overlays") or []):
+                if name in ("body_mask", "lashes"):
+                    continue
+                if name == "eyes_closed":
+                    sx, sy = self._pos("smile")
+                    c.create_image(sx, sy + yo, image=self.im["smile"], anchor="nw")
+                    drawn = True
+                    continue
+                if not self.has.get(name) or name == "head":
+                    continue
+                ox, oy_ = self._pos(name)
+                c.create_image(ox, oy_ + yo, image=self.im[name], anchor="nw")
+            if not drawn:
+                sx, sy = self._pos("smile")
+                c.create_image(sx, sy + yo, image=self.im["smile"], anchor="nw")
+            return
         if not blinking:
             ex, ey = self._pos("pupils")
             c.create_image(ex + pdx, ey + yo + pdy, image=self.im["pupils"], anchor="nw")
@@ -1354,123 +2057,248 @@ class Mascot:
 
     # ── 환경설정 창 ──────────────────────────────────────────────────────
     def open_settings(self):
+        """캔버스로 직접 그린 설정 창 — 그룹 카드 · 토글 · 스테퍼 · 슬라이더."""
         if self._settings_win is not None and self._settings_win.winfo_exists():
             self._settings_win.lift()
             return
-        BG, FG = "#fff7f9", CARD_NAVY
+        cd = self.card
+        PANEL, SOFT, LINE = "#fffdfe", "#fbf3f7", "#f0e6ec"
+        W, PAD, ROW, IN = 372, 20, 40, 18
+        FONT = "Malgun Gothic"
         win = tk.Toplevel(self.root)
         self._settings_win = win
-        win.title("환경설정")
-        win.configure(bg=BG)
+        win.title(f"{self.cfg.get('name', self.char)} 설정")
         win.attributes("-topmost", True)
         win.resizable(False, False)
-        win.geometry(f"+{self.root.winfo_rootx() - 40}+{self.root.winfo_rooty() + 40}")
+        win.configure(bg=PANEL)
 
-        frame = tk.Frame(win, bg=BG, padx=18, pady=14)
-        frame.pack()
-        tk.Label(frame, text=f"🐼 {self.cfg.get('name', self.char)} 설정",
-                 bg=BG, fg=FG, font=("Malgun Gothic", 11, "bold")
-                 ).grid(row=0, column=0, columnspan=2, pady=(0, 10))
+        st = dict(self.us)
+        st["show_timer"] = bool(self.timer_on)
+        if st.get("sound_pack") not in self.sound_packs and self.sound_packs:
+            st["sound_pack"] = self.sound_packs[0]
 
-        def row(r, label):
-            tk.Label(frame, text=label, bg=BG, fg=FG,
-                     font=("Malgun Gothic", 9)).grid(
-                row=r, column=0, sticky="w", pady=3, padx=(0, 12))
+        cv = tk.Canvas(win, width=W, height=640, bg=PANEL, highlightthickness=0)
+        cv.pack()
+        apps_var = tk.StringVar(value=str(st.get("work_apps", "")))
+        apps_entry = tk.Entry(win, textvariable=apps_var, font=(FONT, 8),
+                              relief="flat", bg="#ffffff", fg=cd["text"],
+                              highlightthickness=0, borderwidth=0)
+        hits, sliders = [], []
+        RX = W - PAD - IN            # 오른쪽 컨트롤 기준선
+        LX = PAD + IN                # 왼쪽 라벨 기준선
 
-        v_goal = tk.DoubleVar(value=float(self.us["goal_hours"]))
-        v_idle = tk.DoubleVar(value=float(self.us["idle_sec"]))
-        v_sleep = tk.IntVar(value=int(self.us["sleep_min"]))
-        v_timer = tk.BooleanVar(value=bool(self.timer_on))
-        v_trail = tk.BooleanVar(value=bool(self.us["trail"]))
-        v_top = tk.BooleanVar(value=bool(self.us["topmost"]))
-        v_scale = tk.IntVar(value=int(self.us["scale_pct"]))
-        v_wonly = tk.BooleanVar(value=bool(self.us["work_apps_only"]))
-        v_apps = tk.StringVar(value=str(self.us["work_apps"]))
-        v_shadow = tk.BooleanVar(value=bool(self.us.get("shadow", True)))
-        v_sound = tk.BooleanVar(value=bool(self.us.get("sound", True)))
-        v_vol = tk.IntVar(value=int(self.us.get("sound_volume", 60)))
-        v_pen = tk.IntVar(value=int(self.us.get("pen_volume", 30)))
-        cur_pack = str(self.us.get("sound_pack") or "")
-        if cur_pack not in self.sound_packs and self.sound_packs:
-            cur_pack = self.sound_packs[0]
-        v_pack = tk.StringVar(value=cur_pack)
+        def rrect(x0, y0, x1, y1, r, **kw):
+            pts = [x0 + r, y0, x1 - r, y0, x1, y0, x1, y0 + r, x1, y1 - r, x1, y1,
+                   x1 - r, y1, x0 + r, y1, x0, y1, x0, y1 - r, x0, y0 + r, x0, y0]
+            return cv.create_polygon(pts, smooth=True, **kw)
 
-        row(1, "목표 작업시간 (시간)")
-        tk.Spinbox(frame, from_=0.5, to=16, increment=0.5, width=6,
-                   textvariable=v_goal).grid(row=1, column=1, sticky="w")
-        row(2, "휴식 전환 (초)")
-        tk.Spinbox(frame, from_=5, to=600, increment=5, width=6,
-                   textvariable=v_idle).grid(row=2, column=1, sticky="w")
-        row(3, "잠들기 (분)")
-        tk.Spinbox(frame, from_=1, to=120, increment=1, width=6,
-                   textvariable=v_sleep).grid(row=3, column=1, sticky="w")
-        row(4, "캐릭터 크기 (%)")
-        tk.Spinbox(frame, from_=50, to=200, increment=10, width=6,
-                   textvariable=v_scale).grid(row=4, column=1, sticky="w")
-        row(5, "타자 소리 볼륨 (%)")
-        tk.Spinbox(frame, from_=0, to=100, increment=5, width=6,
-                   textvariable=v_vol).grid(row=5, column=1, sticky="w")
-        row(6, "펜 소리 볼륨 (%)")
-        tk.Spinbox(frame, from_=0, to=100, increment=5, width=6,
-                   textvariable=v_pen).grid(row=6, column=1, sticky="w")
-        v_autostart = tk.BooleanVar(value=bool(self.us.get("autostart", True)))
-        checks = [("작업 타이머 표시", v_timer),
-                  ("작업 프로그램에서만 시간 측정", v_wonly),
-                  ("타자 소리 (Mechvibes 팩)", v_sound),
-                  ("캐릭터 그림자", v_shadow),
-                  ("타블렛 낙서 표시", v_trail),
-                  ("항상 위에 표시", v_top)]
-        if getattr(sys, "frozen", False):     # 자동 실행은 exe 배포본만 의미 있음
-            checks.append(("윈도우 시작 시 자동 실행", v_autostart))
-        rr = 7
-        for label, var in checks:
-            tk.Checkbutton(frame, text=label, variable=var, bg=BG, fg=FG,
-                           activebackground=BG, font=("Malgun Gothic", 9)
-                           ).grid(row=rr, column=0, columnspan=2, sticky="w")
-            rr += 1
-        if self.sound_packs:
-            row(rr, "타자 소리 팩"); rr += 1
-            om = tk.OptionMenu(frame, v_pack, *self.sound_packs)
-            om.configure(bg="#ffffff", font=("Malgun Gothic", 8),
-                         relief="flat", highlightthickness=1)
-            om.grid(row=rr, column=0, columnspan=2, sticky="we", pady=(0, 2))
-            rr += 1
-        row(rr, "작업 프로그램 (쉼표 구분)"); rr += 1
-        tk.Entry(frame, textvariable=v_apps, width=26,
-                 font=("Malgun Gothic", 8)).grid(row=rr, column=0, columnspan=2,
-                                                 sticky="we", pady=(0, 2))
-        rr += 1
-        info = tk.Label(frame, text="크기·타이머·그림자 변경은 저장 시 재시작됩니다",
-                        bg=BG, fg="#b0a3ab", font=("Malgun Gothic", 8))
-        info.grid(row=rr, column=0, columnspan=2, pady=(8, 2))
-        rr += 1
-        self._settings_save_row = rr
+        def header(y):
+            """캐릭터 귀 + 이름 헤더."""
+            hx0, hx1 = PAD, W - PAD
+            deco = cd.get("deco")
+            ec = {"cat": "#f5bdd2", "rose": "#f5bdd2"}.get(deco, "#2b2b2b")
+            for ex in (hx0 + 34, hx1 - 34):
+                if deco == "cat":
+                    cv.create_polygon(ex - 13, y + 18, ex + 2, y - 8, ex + 13, y + 17,
+                                      fill=ec, outline=cd["border"], width=2)
+                else:
+                    cv.create_oval(ex - 13, y - 8, ex + 13, y + 18, fill=ec, outline="")
+            rrect(hx0, y + 10, hx1, y + 62, 18, fill=SOFT,
+                  outline=cd["border"], width=2)
+            cv.create_text(W / 2, y + 36, text=f"{self.cfg.get('name', self.char)} 설정",
+                           font=(FONT, 12, "bold"), fill=cd["text"])
+            return y + 78
+
+        def group(y, title, rows):
+            """제목 + 흰 카드 안에 행들을 균등 배치."""
+            cv.create_oval(PAD + 3, y - 4, PAD + 11, y + 4,
+                           fill=cd["fill"], outline="")
+            cv.create_text(PAD + 18, y, anchor="w", text=title,
+                           font=(FONT, 9, "bold"), fill=cd["fill"])
+            y += 16
+            h = ROW * len(rows) + 14
+            rrect(PAD, y, W - PAD, y + h, 16, fill="#ffffff",
+                  outline=LINE, width=1)
+            ry = y + 7 + ROW / 2
+            for fn in rows:
+                fn(ry)
+                ry += ROW
+            return y + h + 20
+
+        def label(y, text):
+            cv.create_text(LX, y, anchor="w", text=text,
+                           font=(FONT, 9), fill=cd["text"])
+
+        def toggle(y, text, key):
+            label(y, text)
+            on = bool(st.get(key))
+            x1, x0 = RX, RX - 46
+            rrect(x0, y - 11, x1, y + 11, 11,
+                  fill=cd["fill"] if on else "#e2e0e6", outline="")
+            kx = x1 - 12 if on else x0 + 12
+            cv.create_oval(kx - 8.5, y - 8.5, kx + 8.5, y + 8.5,
+                           fill="#ffffff", outline="")
+
+            def flip(k=key):
+                st[k] = not bool(st.get(k))
+            hits.append((x0 - 6, y - 16, x1 + 6, y + 16, flip))
+
+        def stepper(y, text, key, lo, hi, step, suffix=""):
+            label(y, text)
+            val = float(st.get(key, lo))
+            for sign, cx in ((1, RX - 13), (-1, RX - 99)):
+                cv.create_oval(cx - 13, y - 13, cx + 13, y + 13,
+                               fill=SOFT, outline=cd["border"], width=1)
+                cv.create_line(cx - 5, y, cx + 5, y, width=2,
+                               capstyle="round", fill=cd["text"])
+                if sign > 0:
+                    cv.create_line(cx, y - 5, cx, y + 5, width=2,
+                                   capstyle="round", fill=cd["text"])
+
+                def bump(s=sign, k=key, lo=lo, hi=hi, stp=step):
+                    v = float(st.get(k, lo)) + s * stp
+                    st[k] = max(lo, min(hi, round(v, 2)))
+                hits.append((cx - 15, y - 15, cx + 15, y + 15, bump))
+            cv.create_text(RX - 56, y, text=f"{val:g}{suffix}",
+                           font=(FONT, 9, "bold"), fill=cd["text"])
+
+        def slider(y, text, key, lo, hi):
+            label(y, text)
+            val = float(st.get(key, lo))
+            sx0, sx1 = RX - 148, RX - 46
+            cv.create_line(sx0, y, sx1, y, width=6, capstyle="round", fill="#efedf1")
+            frac = (val - lo) / max(hi - lo, 1)
+            if frac > 0.01:
+                cv.create_line(sx0, y, sx0 + (sx1 - sx0) * frac, y, width=6,
+                               capstyle="round", fill=cd["fill"])
+            kx = sx0 + (sx1 - sx0) * frac
+            cv.create_oval(kx - 9, y - 9, kx + 9, y + 9, fill="#ffffff",
+                           outline=cd["fill"], width=2)
+            cv.create_text(RX, y, anchor="e", text=f"{val:g}",
+                           font=(FONT, 9, "bold"), fill=cd["text"])
+            sliders.append((sx0, sx1, y, key, lo, hi))
+
+        def chevron(cx, y, sign):
+            """sign -1이면 ‹, +1이면 › 모양."""
+            for dy in (-5, 5):
+                cv.create_line(cx - sign * 3, y + dy, cx + sign * 3, y,
+                               width=2, capstyle="round", fill=cd["fill"])
+
+        def picker(y, text, key, options):
+            label(y, text)
+            if not options:
+                cv.create_text(RX, y, anchor="e", text="(없음)",
+                               font=(FONT, 8), fill=cd["sub"])
+                return
+            cur = st.get(key, options[0])
+            idx = options.index(cur) if cur in options else 0
+            bx0, bx1 = RX - 176, RX
+            rrect(bx0, y - 14, bx1, y + 14, 14, fill=SOFT,
+                  outline=cd["border"], width=1)
+            name = options[idx]
+            if len(name) > 16:
+                name = name[:15] + "…"
+            cv.create_text((bx0 + bx1) / 2, y, text=name,
+                           font=(FONT, 8), fill=cd["text"])
+            for sign, cx in ((-1, bx0 + 15), (1, bx1 - 15)):
+                chevron(cx, y, sign)
+
+                def cyc(s=sign, k=key, o=options):
+                    i = (o.index(st.get(k, o[0])) if st.get(k) in o else 0)
+                    st[k] = o[(i + s) % len(o)]
+                hits.append((cx - 13, y - 14, cx + 13, y + 14, cyc))
+
+        def draw():
+            cv.delete("all")
+            hits.clear()
+            sliders.clear()
+            y = header(24)
+            y = group(y, "타이머", [
+                lambda ry: stepper(ry, "목표 작업시간", "goal_hours", 0.5, 16, 0.5, "h"),
+                lambda ry: stepper(ry, "휴식 전환", "idle_sec", 5, 600, 5, "초"),
+                lambda ry: stepper(ry, "잠들기", "sleep_min", 1, 120, 1, "분"),
+                lambda ry: toggle(ry, "작업 타이머 표시", "show_timer"),
+                lambda ry: toggle(ry, "작업 프로그램에서만 측정", "work_apps_only"),
+            ])
+            y = group(y, "소리", [
+                lambda ry: slider(ry, "타자 소리 볼륨", "sound_volume", 0, 100),
+                lambda ry: slider(ry, "펜 소리 볼륨", "pen_volume", 0, 100),
+                lambda ry: toggle(ry, "타자 소리", "sound"),
+                lambda ry: picker(ry, "소리 팩", "sound_pack", self.sound_packs),
+            ])
+            disp = [
+                lambda ry: stepper(ry, "캐릭터 크기", "scale_pct", 50, 200, 10, "%"),
+                lambda ry: toggle(ry, "캐릭터 그림자", "shadow"),
+                lambda ry: toggle(ry, "타블렛 낙서 표시", "trail"),
+                lambda ry: toggle(ry, "항상 위에 표시", "topmost"),
+            ]
+            if getattr(sys, "frozen", False):
+                disp.append(lambda ry: toggle(ry, "윈도우 시작 시 자동 실행",
+                                              "autostart"))
+            y = group(y, "표시", disp)
+
+            cv.create_oval(PAD + 3, y - 4, PAD + 11, y + 4,
+                           fill=cd["fill"], outline="")
+            cv.create_text(PAD + 18, y, anchor="w", text="작업 프로그램",
+                           font=(FONT, 9, "bold"), fill=cd["fill"])
+            cv.create_text(W - PAD - 4, y, anchor="e", text="쉼표로 구분",
+                           font=(FONT, 8), fill=cd["sub"])
+            y += 16
+            rrect(PAD, y, W - PAD, y + 50, 16, fill="#ffffff",
+                  outline=LINE, width=1)
+            cv.create_window(LX, y + 13, anchor="nw", window=apps_entry,
+                             width=W - PAD * 2 - IN * 2, height=24)
+            y += 50 + 22
+
+            cv.create_text(W / 2, y, text="크기 · 타이머 · 그림자는 저장 시 재시작",
+                           font=(FONT, 8), fill=cd["sub"])
+            y += 22
+            bx0, bx1 = W / 2 - 64, W / 2 + 64
+            rrect(bx0, y, bx1, y + 40, 18, fill=cd["fill"], outline="")
+            cv.create_text(W / 2, y + 20, text="저장",
+                           font=(FONT, 10, "bold"), fill="#ffffff")
+            hits.append((bx0, y, bx1, y + 40, save))
+            cv.config(height=y + 40 + 22)
+
+        def set_slider(key, x, sx0, sx1, lo, hi):
+            frac = min(1.0, max(0.0, (x - sx0) / max(sx1 - sx0, 1)))
+            step = 5 if hi > 20 else 1
+            st[key] = int(round((lo + (hi - lo) * frac) / step) * step)
+
+        def on_click(e):
+            for x0, y0, x1, y1, fn in hits:
+                if x0 <= e.x <= x1 and y0 <= e.y <= y1:
+                    fn()
+                    if win.winfo_exists():
+                        draw()
+                    return
+            for sx0, sx1, sy, key, lo, hi in sliders:
+                if sx0 - 12 <= e.x <= sx1 + 12 and sy - 14 <= e.y <= sy + 14:
+                    set_slider(key, e.x, sx0, sx1, lo, hi)
+                    draw()
+                    return
+
+        def on_drag(e):
+            for sx0, sx1, sy, key, lo, hi in sliders:
+                if sy - 16 <= e.y <= sy + 16:
+                    set_slider(key, e.x, sx0, sx1, lo, hi)
+                    draw()
+                    return
 
         def save():
-            try:
-                new = {"goal_hours": float(v_goal.get()),
-                       "idle_sec": max(float(v_idle.get()), 5.0),
-                       "sleep_min": max(1, int(v_sleep.get())),
-                       "show_timer": bool(v_timer.get()),
-                       "trail": bool(v_trail.get()),
-                       "topmost": bool(v_top.get()),
-                       "scale_pct": max(50, min(200, int(v_scale.get()))),
-                       "work_apps_only": bool(v_wonly.get()),
-                       "work_apps": v_apps.get().strip(),
-                       "shadow": bool(v_shadow.get()),
-                       "sound": bool(v_sound.get()),
-                       "sound_volume": max(0, min(100, int(v_vol.get()))),
-                       "pen_volume": max(0, min(100, int(v_pen.get()))),
-                       "sound_pack": v_pack.get(),
-                       "autostart": bool(v_autostart.get())}
-            except Exception:
-                return
+            new = dict(st)
+            new["work_apps"] = apps_var.get().strip()
+            new["goal_hours"] = float(new["goal_hours"])
+            new["idle_sec"] = max(float(new["idle_sec"]), 5.0)
+            new["sleep_min"] = max(1, int(new["sleep_min"]))
+            new["scale_pct"] = max(50, min(200, int(new["scale_pct"])))
+            for k in ("sound_volume", "pen_volume"):
+                new[k] = max(0, min(100, int(new[k])))
             need_restart = (new["scale_pct"] != self.us["scale_pct"]
-                            or new["show_timer"] != self.timer_on
-                            or new["shadow"] != bool(self.us.get("shadow", True)))
+                            or bool(new["show_timer"]) != self.timer_on
+                            or bool(new["shadow"]) != bool(self.us.get("shadow", True)))
             self.us.update(new)
             self._save_settings()
-            # 즉시 반영 가능한 항목
             self.idle_thr = self.us["idle_sec"]
             self.root.attributes("-topmost", bool(self.us["topmost"]))
             self._init_sound()
@@ -1479,10 +2307,17 @@ class Mascot:
             if need_restart:
                 self._restart()
 
-        tk.Button(frame, text="저장", command=save, width=10,
-                  bg=CARD_BORDER, fg="#5b3a44", relief="flat",
-                  font=("Malgun Gothic", 9, "bold")).grid(
-            row=self._settings_save_row, column=0, columnspan=2, pady=(6, 0))
+        cv.bind("<Button-1>", on_click)
+        cv.bind("<B1-Motion>", on_drag)
+        draw()
+        # 화면 밖으로 나가 저장 버튼이 잘리지 않게 위치 보정
+        win.update_idletasks()
+        wh, ww = win.winfo_height(), win.winfo_width()
+        sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+        px = min(max(self.root.winfo_rootx() - 70, 10), max(sw - ww - 10, 10))
+        py = min(max(self.root.winfo_rooty() - 30, 10), max(sh - wh - 60, 10))
+        win.geometry(f"+{int(px)}+{int(py)}")
+
 
     def _save_settings(self):
         try:
