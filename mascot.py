@@ -542,6 +542,7 @@ class Mascot:
                 self.us.update(json.load(fp))
         except Exception:
             pass
+        self._sanitize_settings()
 
         s = self.s = float(self.cfg.get("scale", 1.0)) * self.us["scale_pct"] / 100.0
         self.timer_on = bool(tcfg.get("enabled")) \
@@ -592,6 +593,7 @@ class Mascot:
         self.hat_until = 0.0         # 고깔모자 표시 종료 시각
         self.smile_until = 0.0       # 웃는 표정 종료 시각
         self.celebrate_until = 0.0   # 축하 연출 종료 시각
+        self._fail = {}              # 구역별 실패 횟수 (3회면 그 구역만 끔)
         self._pet_drawn = []         # 이번 프레임에 그린 반려동물 (그림자용)
         self._pet_sh_cache = {}
         self._pet_sh_on = False
@@ -1817,9 +1819,25 @@ class Mascot:
             with open(os.path.join(self.state_dir, ".error.log"), "a",
                       encoding="utf-8") as fp:
                 fp.write(f"\n===== {time.strftime('%Y-%m-%d %H:%M:%S')} {where}\n")
+                fp.write(f"char={self.char} frozen={getattr(sys, 'frozen', False)} "
+                         f"scale={self.s:.3f} oy={self.oy} WH={self.W}x{self.H}\n")
+                fp.write(f"timer_on={self.timer_on} fun={self.fun} "
+                         f"pets={list(getattr(self, '_pet_hide', {}))} "
+                         f"has={sorted(k for k, v in self.has.items() if v)}\n")
+                fp.write(f"settings={self.us}\n")
                 traceback.print_exc(file=fp)
         except Exception:
             pass
+
+    def _safe(self, where, fn, *args):
+        """부분 실패가 화면 전체를 지우지 못하게 — 3번 터지면 그 구역만 끈다."""
+        if self._fail.get(where, 0) >= 3:
+            return
+        try:
+            fn(*args)
+        except Exception:
+            self._fail[where] = self._fail.get(where, 0) + 1
+            self._log_error(where)
 
     def tick(self):
         # 다음 프레임을 먼저 예약한다 — 중간에 예외가 나도 루프가 죽지 않게
@@ -1929,13 +1947,14 @@ class Mascot:
             blinking = False
 
         self._pet_drawn = []
-        state = self._timer_tick(now, idle) if self.timer_on else "idle"
-        try:                            # 귀여운 연출이 캐릭터를 못 지우게 격리
-            self._fun_tick(now, state, sleeping)
+        try:
+            state = self._timer_tick(now, idle) if self.timer_on else "idle"
         except Exception:
-            self._log_error("fun_tick")
+            state, _ = "idle", self._log_error("timer_tick")
+        # 아래는 모두 구역 격리 — 하나가 터져도 캐릭터 본체는 그려진다
+        self._safe("fun_tick", self._fun_tick, now, state, sleeping)
         if self.timer_on:
-            self._draw_timer(state, sleeping, now)
+            self._safe("timer", self._draw_timer, state, sleeping, now)
 
         # ── 몸 (+머리 없는 캐릭터는 여기서 얼굴까지) ─────────────────────
         # 개는 머리를 팔 위에 그려야 어깨가 안 튀어나오므로, 얼굴을 팔 뒤로 미룬다.
@@ -1944,15 +1963,13 @@ class Mascot:
         head_early = self.cfg.get("arms_over_head") and self.has.get("head")
         if not self.has.get("head"):
             self._draw_face(yo, pdx, pdy, blinking, smiling)
-        elif head_early:                # 준사: 책상·팔이 머리 위 (PSD 레이어 순서)
-            self._draw_head(now, yo, pdx, pdy, blinking, smiling, sleeping)
+        elif head_early:                # 준사: 책상·팔이 머리 위 (PSD 순서)
+            self._safe("head", self._draw_head, now, yo, pdx, pdy,
+                       blinking, smiling, sleeping)
 
         # 반려동물은 책상 바로 앞(=책상에 가려지게) 그린다
         if not self.cfg.get("pet_front"):
-            try:
-                self._draw_pet(now)
-            except Exception:
-                self._log_error("draw_pet")
+            self._safe("pet", self._draw_pet, now)
 
         # ── 책상 (+옵션: 화면 낙서) ──────────────────────────────────────
         c.create_image(*self._pos("desk"), image=self.im["desk"], anchor="nw")
@@ -1974,11 +1991,39 @@ class Mascot:
 
         # 앞으로 나오는 반려동물: 얼굴 위 · 팔 아래 (책상선 마스크는 그대로)
         if self.cfg.get("pet_front"):
-            try:
-                self._draw_pet(now)
-            except Exception:
-                self._log_error("draw_pet")
+            self._safe("pet", self._draw_pet, now)
 
+        self._safe("arms", self._draw_arms, now, f, yo, pen_typing, cx, cy)
+
+        # ── 머리(팔 위) + 얼굴 — 개처럼 머리를 분리한 캐릭터 ──────────────
+        # 머리를 팔보다 위에 그려 어깨가 머리 밖으로 튀어나오지 않게 한다.
+        if self.has.get("head") and not head_early:
+            self._safe("head", self._draw_head, now, yo, pdx, pdy,
+                       blinking, smiling, sleeping)
+
+        # 수면 모드: 머리 위쪽에 둥실거리는 zzZ (머리보다 위에 그린다)
+        if sleeping:
+            hx0, hy0, hx1, hy1 = self._head_box
+            zx = min(hx1 - 14, self.W - 42)
+            zy = hy0 + self.oy + yo + 10
+            for i, (dx, dy, size, color) in enumerate((
+                    (0, 22, 10, "#aab7cc"),
+                    (13, 4, 13, "#93a4c2"),
+                    (28, -16, 16, "#7c90b5"))):
+                bob = math.sin(now * 1.6 + i * 0.9) * 3
+                c.create_text(zx + dx, zy + dy + bob, text="z" if i == 0 else "Z",
+                              font=("Malgun Gothic", size, "bold"), fill=color)
+
+        # ── 귀여운 연출: 고깔모자 → 폭죽 → 말풍선 (맨 위) ────────────────
+        if self.fun:
+            self._safe("hat", self._draw_hat, yo)
+            self._safe("particles", self._draw_particles)
+            self._safe("bubble", self._draw_bubble, yo)
+        self._safe("pet_shadow", self._update_pet_shadow)
+
+    def _draw_arms(self, now, f, yo, pen_typing, cx, cy):
+        """펜 추적 팔 또는 타이핑 팔 (환경 의존 코드가 많아 따로 격리)."""
+        c = self.canvas
         # ── 오른손/오른팔: 펜 추적 또는 타이핑 파츠(어깨 축 회전) ────────
         if pen_typing and "pen" not in f:
             # 양손 타이핑: 왼손을 먼저(아래), 오른팔-타자를 나중(위) 그림
@@ -2038,37 +2083,6 @@ class Mascot:
                     elif now - self._pen_release_t > 0.07:
                         self._pen_playing = False
 
-        # ── 머리(팔 위) + 얼굴 — 개처럼 머리를 분리한 캐릭터 ──────────────
-        # 머리를 팔보다 위에 그려 어깨가 머리 밖으로 튀어나오지 않게 한다.
-        if self.has.get("head") and not head_early:
-            self._draw_head(now, yo, pdx, pdy, blinking, smiling, sleeping)
-
-        # 수면 모드: 머리 위쪽에 둥실거리는 zzZ (머리보다 위에 그린다)
-        if sleeping:
-            hx0, hy0, hx1, hy1 = self._head_box
-            zx = min(hx1 - 14, self.W - 42)
-            zy = hy0 + self.oy + yo + 10
-            for i, (dx, dy, size, color) in enumerate((
-                    (0, 22, 10, "#aab7cc"),
-                    (13, 4, 13, "#93a4c2"),
-                    (28, -16, 16, "#7c90b5"))):
-                bob = math.sin(now * 1.6 + i * 0.9) * 3
-                c.create_text(zx + dx, zy + dy + bob, text="z" if i == 0 else "Z",
-                              font=("Malgun Gothic", size, "bold"), fill=color)
-
-        # ── 귀여운 연출: 고깔모자 → 폭죽 → 말풍선 (맨 위) ────────────────
-        if self.fun:
-            try:
-                self._draw_hat(yo)
-                self._draw_particles()
-                self._draw_bubble(yo)
-            except Exception:
-                self._log_error("fun_draw")
-
-        try:                            # 반려동물 그림자 (나와 있을 때만)
-            self._update_pet_shadow()
-        except Exception:
-            self._log_error("pet_shadow")
 
     def _draw_head(self, now, yo, pdx, pdy, blinking, smiling, sleeping):
         """머리 + 얼굴 (자는 중이면 목을 축으로 기울인 합성본)."""
@@ -2402,6 +2416,28 @@ class Mascot:
         py = min(max(self.root.winfo_rooty() - 30, 10), max(sh - wh - 60, 10))
         win.geometry(f"+{int(px)}+{int(py)}")
 
+
+    def _sanitize_settings(self):
+        """저장된 설정 값이 빈 문자열·null·엉뚱한 형이면 기본값으로 되돌린다.
+
+        옛 설정 창은 텍스트 입력이라 ""가 저장될 수 있었고, 그대로 float()에
+        들어가면 매 프레임 예외가 나 화면이 통째로 비어 버린다.
+        """
+        for k, dv in DEFAULT_SETTINGS.items():
+            v = self.us.get(k, dv)
+            if isinstance(dv, bool):
+                self.us[k] = bool(v)
+            elif isinstance(dv, (int, float)):
+                try:
+                    self.us[k] = type(dv)(float(v))
+                except (TypeError, ValueError):
+                    self.us[k] = dv
+            elif isinstance(dv, str) and not isinstance(v, str):
+                self.us[k] = dv
+        self.us["sleep_min"] = max(1, int(self.us["sleep_min"]))
+        self.us["idle_sec"] = max(5.0, float(self.us["idle_sec"]))
+        self.us["goal_hours"] = max(0.5, float(self.us["goal_hours"]))
+        self.us["scale_pct"] = max(50, min(200, int(self.us["scale_pct"])))
 
     def _save_settings(self):
         try:
