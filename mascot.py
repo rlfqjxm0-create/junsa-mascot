@@ -435,6 +435,84 @@ def monitor_at(x, y):
     return 0, 0, u.GetSystemMetrics(0), u.GetSystemMetrics(1)
 
 
+UPDATE_REPOS = {                 # 선물 캐릭터 자동 업데이트 배포 레포
+    "parts_junsa": "rlfqjxm0-create/junsa-mascot",
+    "parts_dog": "rlfqjxm0-create/dog-mascot",
+}
+
+
+def _parts_broken(char_dir):
+    """layout.json과 실제 PNG가 어긋나 있는지 = 업데이트가 중간에 끊긴 상태."""
+    try:
+        with open(os.path.join(char_dir, "layout.json"), encoding="utf-8") as fp:
+            layout = json.load(fp)
+    except Exception:
+        return True
+    for name, info in layout.items():
+        if not isinstance(info, dict) or "size" not in info:
+            continue
+        p = os.path.join(char_dir, f"{name}.png")
+        if not os.path.exists(p):
+            return True
+        try:
+            with Image.open(p) as im:
+                if list(im.size) != list(info["size"]):
+                    return True
+        except Exception:
+            return True
+    return False
+
+
+def repair_parts(char_dir):
+    """파츠가 섞여 있으면 배포 레포에서 다시 받아 맞춘다 (선물 exe 전용).
+
+    자동 업데이트가 파일 하나씩 덮어쓰는 방식이라, 도중에 네트워크가 끊기면
+    새 PNG + 옛 layout.json 처럼 섞인 상태로 남아 캐릭터가 깨져 보인다.
+    실행할 때마다 정합성을 확인하고, 어긋나 있으면 여기서 복구한다.
+    """
+    repo = UPDATE_REPOS.get(os.path.basename(char_dir))
+    if not (repo and getattr(sys, "frozen", False)):
+        return                              # 개발 환경에서는 건드리지 않는다
+    if not _parts_broken(char_dir):
+        return
+    import hashlib
+    import urllib.request
+    base = os.path.dirname(char_dir)
+
+    def fetch(rel):
+        url = f"https://raw.githubusercontent.com/{repo}/main/{rel}"
+        req = urllib.request.Request(url, headers={"User-Agent": "mascot-repair"})
+        for i in range(3):
+            try:
+                with urllib.request.urlopen(req, timeout=20) as r:
+                    return r.read()
+            except Exception:
+                if i == 2:
+                    raise
+                time.sleep(1.0)
+
+    try:
+        man = json.loads(fetch("version.json").decode("utf-8"))
+        for rel, want in man.get("files", {}).items():
+            p = os.path.join(base, rel.replace("/", os.sep))
+            try:
+                with open(p, "rb") as fp:
+                    if hashlib.sha256(fp.read()).hexdigest() == want:
+                        continue
+            except Exception:
+                pass
+            data = fetch(rel)
+            if hashlib.sha256(data).hexdigest() != want:
+                return                      # 내려받은 게 손상 — 다음 실행에 재시도
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            with open(p, "wb") as fp:
+                fp.write(data)
+        with open(os.path.join(base, "version.json"), "w", encoding="utf-8") as fp:
+            json.dump(man, fp)
+    except Exception:
+        pass                                # 오프라인이면 있는 그대로 실행
+
+
 class Mascot:
     def __init__(self, char_dir="parts", preview=False, state_dir=None):
         self.char_arg = char_dir
@@ -443,6 +521,7 @@ class Mascot:
         # 설정·타이머 기록 저장 위치 (자동 업데이트로 교체되지 않는 곳으로 분리 가능)
         self.state_dir = state_dir or self.dir
         os.makedirs(self.state_dir, exist_ok=True)
+        repair_parts(self.dir)          # 업데이트가 끊겨 파츠가 섞였으면 복구
         with open(os.path.join(self.dir, "layout.json"), encoding="utf-8") as fp:
             self.layout = json.load(fp)
         with open(os.path.join(self.dir, "config.json"), encoding="utf-8") as fp:
