@@ -16,5 +16,10 @@
  "pet_rot": -10,
  "pet_front": true,
  "arms_over_head": true,
- "pet_dx": 60
+ "pet_dx": 60,
+ "pet_variants": true,
+ "skins": [
+  {"name": "기본", "dir": ""},
+  {"name": "메이드복", "dir": "skins/maid"}
+ ]
 }
