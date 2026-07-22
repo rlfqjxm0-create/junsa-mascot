@@ -439,6 +439,7 @@ def monitor_at(x, y):
 UPDATE_REPOS = {                 # 선물 캐릭터 자동 업데이트 배포 레포
     "parts_junsa": "rlfqjxm0-create/junsa-mascot",
     "parts_dog": "rlfqjxm0-create/dog-mascot",
+    "parts_quincy": "rlfqjxm0-create/quincy-mascot",
 }
 
 
@@ -580,6 +581,10 @@ class Mascot:
             "text": cc.get("text", CARD_NAVY), "sub": cc.get("sub", CARD_GRAY),
             "track": cc.get("track", CARD_TRACK), "fill": cc.get("fill", CARD_FILL),
             "deco": cc.get("deco", "panda"),
+            # 설정·브리핑 창 배경 (캐릭터 테마에 맞춰 바꿀 수 있게)
+            "panel": cc.get("panel", "#fffdfe"),
+            "soft": cc.get("soft", "#fbf3f7"),
+            "line": cc.get("line", "#f0e6ec"),
         }
 
         # 워크스페이스 워크타이머 연동 (config의 workspace_timer = 라이브 파일 경로)
@@ -617,6 +622,7 @@ class Mascot:
         self.smile_until = 0.0       # 웃는 표정 종료 시각
         self.celebrate_until = 0.0   # 축하 연출 종료 시각
         self._fail = {}              # 구역별 실패 횟수 (3회면 그 구역만 끔)
+        self._pen_draw = None        # 펜 손을 머리 뒤에 그릴 때 쓰는 임시 보관
         self._pet_drawn = []         # 이번 프레임에 그린 반려동물 (그림자용)
         self._pet_sh_cache = {}
         self._pet_sh_on = False
@@ -730,10 +736,34 @@ class Mascot:
         """
         if not self.cfg.get("hard_alpha"):
             return im
-        r, g, b, a = im.split()
+        from PIL import ImageChops, ImageFilter
+        a = im.getchannel("A")
+        solid = a.point(lambda v: 255 if v >= 128 else 0)
+        # 반투명하게 그려진 '내부 선'(옅은 음영 등)은 살린다 — 주변이 대부분
+        # 불투명하면 실루엣 안쪽이라는 뜻. 알파 0인 진짜 빈틈은 건드리지 않는다.
+        near = solid.filter(ImageFilter.GaussianBlur(2))
+        inner = ImageChops.multiply(
+            a.point(lambda v: 255 if 0 < v < 128 else 0),
+            near.point(lambda v: 255 if v >= 150 else 0))
         im = im.copy()
-        im.putalpha(a.point(lambda v: 255 if v >= 128 else 0))
+        im.putalpha(self._fill_holes(ImageChops.lighter(solid, inner)))
         return im
+
+    @staticmethod
+    def _fill_holes(solid):
+        """실루엣 '안쪽'의 투명 구멍만 메운다.
+
+        얼굴의 옅은 음영선처럼 반투명하게 그려진 내부 선은 이분화하면 구멍이
+        되어, 밝은 배경에서 흰 점·선으로 비쳐 보인다(퀸시 사건). 바깥과
+        이어지지 않은 투명 영역만 채우므로 실루엣 모양은 그대로 유지된다.
+        """
+        from PIL import ImageChops, ImageDraw
+        w, h = solid.size
+        pad = Image.new("L", (w + 2, h + 2), 0)
+        pad.paste(solid, (1, 1))
+        ImageDraw.floodfill(pad, (0, 0), 128)        # 바깥 투명 영역만 표시
+        holes = pad.point(lambda v: 255 if v == 0 else 0).crop((1, 1, w + 1, h + 1))
+        return ImageChops.lighter(solid, holes)
 
     def _load_parts(self):
         s = self.s
@@ -751,7 +781,7 @@ class Mascot:
         pil_cache = {}
         for name in ("body_open", "pupils", "body_mask", "lashes", "hair",
                      "eyes_closed", "head", "desk", "arm_pen",
-                     "smile", "pet1", "pet2"):
+                     "smile", "pet1", "pet2", "scarf"):
             # 파일과 layout 위치가 둘 다 있어야 사용 (자동업데이트 섞임 대비)
             self.has[name] = (os.path.exists(os.path.join(self.parts_dir,
                                                           f"{name}.png"))
@@ -996,7 +1026,8 @@ class Mascot:
             return 0
         if self.has_clock:
             return OY_CLOCK_OPEN if self.clock_open else OY_CLOCK_COMPACT
-        return TIMER_H + (26 if self.cfg.get("fun") else 0)  # 종료 버튼 자리
+        extra = int(self.cfg.get("card_top", 22)) - 22        # 장식 여유 (토끼 귀)
+        return TIMER_H + (26 if self.cfg.get("fun") else 0) + extra
 
     def _bake_oy(self):
         """oy(카드 높이)에 의존하는 좌표들 — 시계 토글로 oy가 바뀌면 다시 부른다."""
@@ -1030,7 +1061,8 @@ class Mascot:
         from PIL import ImageDraw, ImageFilter
         P = SHADOW_PAD
         comp = Image.new("RGBA", (self.W + 2 * P, self.H + 2 * P), (0, 0, 0, 0))
-        for name in ("body_open", "lashes", "hair", "head", "desk", "arm_pen"):
+        for name in ("body_open", "scarf", "lashes", "hair", "head",
+                     "desk", "arm_pen"):
             if name in self._pil_cache:
                 x, y = self._pos(name)
                 comp.alpha_composite(self._pil_cache[name], (round(x) + P, round(y) + P))
@@ -1063,7 +1095,7 @@ class Mascot:
         else:
             w, h = 200, (88 if self.cfg.get("fun") else 62)
         x0 = getattr(self, "card_cx", self.W / 2) - w / 2
-        y0 = 22
+        y0 = float(self.cfg.get("card_top", 22))
         return {"x0": x0, "y0": y0, "x1": x0 + w, "y1": y0 + h, "w": w, "h": h}
 
     def _resample(self):
@@ -1201,7 +1233,7 @@ class Mascot:
         now = time.time()
         self.click_bounce = now + 0.45
         self.squash_until = now + 0.12
-        self._say(random.choice(self.CLICK_TALK), 2.2)
+        self._say(random.choice(self._click_pool()), 2.2)
 
     def _toggle_clock(self):
         """시계 펼침/접힘 — 창 높이를 바꾸고(아래 고정) 좌표·그림자 재계산."""
@@ -1328,6 +1360,29 @@ class Mascot:
                x1 - r, y1, x0 + r, y1, x0, y1, x0, y1 - r, x0, y0 + r, x0, y0]
         return self.canvas.create_polygon(pts, smooth=True, **kw)
 
+    @staticmethod
+    def _ear_pts(cx, cy, droop, k=1.0):
+        """카드 위 토끼 귀 윤곽 (베지에 척추 + 폭). droop=1이면 옆으로 접힌다."""
+        p0 = (cx, cy)
+        if droop:
+            p1, p2 = (cx + 1, cy - 28), (cx + 24, cy - 16)
+        else:
+            p1, p2 = (cx - 4, cy - 26), (cx + 1, cy - 33)
+        left, right, N = [], [], 8
+        for i in range(N + 1):
+            t = i / N
+            u = 1 - t
+            x = u * u * p0[0] + 2 * u * t * p1[0] + t * t * p2[0]
+            y = u * u * p0[1] + 2 * u * t * p1[1] + t * t * p2[1]
+            dx = 2 * u * (p1[0] - p0[0]) + 2 * t * (p2[0] - p1[0])
+            dy = 2 * u * (p1[1] - p0[1]) + 2 * t * (p2[1] - p1[1])
+            n = math.hypot(dx, dy) or 1.0
+            nx, ny = -dy / n, dx / n
+            w = (1.6 + 5.6 * math.sin(math.pi * (0.16 + 0.8 * t))) * k
+            left.append((x + nx * w, y + ny * w))
+            right.append((x - nx * w, y - ny * w))
+        return [v for p in left + right[::-1] for v in p]
+
     def _draw_deco(self, x0, y0, x1, y1):
         """카드 위 장식(귀 등) — 캐릭터 컨셉별."""
         c = self.canvas
@@ -1353,6 +1408,23 @@ class Mascot:
                               fill="#2b2b2b", outline="")
                 c.create_oval(ex - 9, y0 - 7, ex + 3, y0 + 14,
                               fill="#4a4a4a", outline="")
+        elif deco == "rabbit":
+            base = self.card.get("bg", "#ffffff")
+            inner = self.card.get("track", "#c9d3e6")
+            for sign, ex in ((-1, x0 + 26), (1, x1 - 34)):
+                droop = 1 if sign > 0 else 0        # 오른쪽 귀는 접혀 내려감
+                c.create_polygon(self._ear_pts(ex, y0 + 10, droop),
+                                 smooth=True, fill=base,
+                                 outline=self.card["border"], width=2)
+                c.create_polygon(self._ear_pts(ex, y0 + 8, droop, 0.42),
+                                 smooth=True, fill=inner, outline="")
+        elif deco == "scarf":
+            navy, silver = "#2f3f66", "#dfe5f0"
+            self._rrect(x0 + 14, y0 - 15, x1 - 14, y0 + 7, 9, fill=navy, outline="")
+            span = (x1 - x0 - 76) / 3
+            for i in range(4):
+                sx = x0 + 44 + i * span
+                c.create_line(sx, y0 - 13, sx - 7, y0 + 5, fill=silver, width=3)
         elif deco == "rose":
             for ex in (x0 + 26, x1 - 26):
                 c.create_oval(ex - 12, y0 - 17, ex + 12, y0 + 7,
@@ -1440,7 +1512,10 @@ class Mascot:
         self.bubble = (text, time.time() + secs)
 
     def _talk_pool(self, state):
-        return self.TALK
+        return self.cfg.get("talk") or self.TALK
+
+    def _click_pool(self):
+        return self.cfg.get("click_talk") or self._talk_pool(None)
 
     def _fun_tick(self, now, state, sleeping):
         """혼잣말·반려동물 스케줄과 폭죽 물리 (매 프레임)."""
@@ -1702,8 +1777,9 @@ class Mascot:
         win.title("오늘의 작업")
         win.attributes("-topmost", True)
         win.resizable(False, False)
-        win.configure(bg="#fffdfe")
-        cv = tk.Canvas(win, width=W, height=H, bg="#fffdfe", highlightthickness=0)
+        win.configure(bg=cd["panel"])
+        cv = tk.Canvas(win, width=W, height=H, bg=cd["panel"],
+                       highlightthickness=0)
         cv.pack()
 
         def rr(x0, y0, x1, y1, r, **kw):
@@ -1712,7 +1788,7 @@ class Mascot:
             return cv.create_polygon(pts, smooth=True, **kw)
 
         y = 22
-        rr(PAD, y, W - PAD, y + HEAD_H, 18, fill="#fdf4f8",
+        rr(PAD, y, W - PAD, y + HEAD_H, 18, fill=cd["soft"],
            outline=cd["border"], width=2)
         cv.create_text(W / 2, y + 30, text="오늘도 수고하셨어요!",
                        font=("Malgun Gothic", 12, "bold"), fill=cd["text"])
@@ -1721,12 +1797,12 @@ class Mascot:
         y += HEAD_H + 22
 
         rr(PAD, y, W - PAD, y + body_h, 16, fill="#ffffff",
-           outline="#f0e6ec", width=1)
+           outline=cd["line"], width=1)
         ry = y + 10 + ROW / 2
         for i, (k, v) in enumerate(rows):
             if i:
                 cv.create_line(PAD + 18, ry - ROW / 2, W - PAD - 18, ry - ROW / 2,
-                               fill="#f6eef4")
+                               fill=cd["line"])
             cv.create_text(PAD + 18, ry, anchor="w", text=k,
                            font=("Malgun Gothic", 9), fill=cd["sub"])
             cv.create_text(W - PAD - 18, ry, anchor="e", text=v,
@@ -2025,11 +2101,17 @@ class Mascot:
 
         self._safe("arms", self._draw_arms, now, f, yo, pen_typing, cx, cy)
 
+        if self.has.get("scarf"):       # 목도리 — 팔 위, 머리 아래
+            sx, sy = self._pos("scarf")
+            c.create_image(sx, sy + yo, image=self.im["scarf"], anchor="nw")
+
         # ── 머리(팔 위) + 얼굴 — 개처럼 머리를 분리한 캐릭터 ──────────────
         # 머리를 팔보다 위에 그려 어깨가 머리 밖으로 튀어나오지 않게 한다.
         if self.has.get("head") and not head_early:
             self._safe("head", self._draw_head, now, yo, pdx, pdy,
                        blinking, smiling, sleeping)
+        if self.cfg.get("pen_over_head"):     # 퀸시: 깃펜이 맨 위 레이어
+            self._safe("pen_hand", self._draw_pen_hand)
 
         # 수면 모드: 머리 위쪽에 둥실거리는 zzZ (머리보다 위에 그린다)
         if sleeping:
@@ -2096,8 +2178,9 @@ class Mascot:
             arm_img = self._stretched_arm(hx_ - sx, hy_ - sy)
             c.create_image((sx + hx_) / 2, (sy + hy_) / 2,
                            image=arm_img, anchor="center")
-            c.create_image(px + ddx, py + ddy,
-                           image=self.im["arm_pen"], anchor="nw")
+            self._pen_draw = (px + ddx, py + ddy)
+            if not self.cfg.get("pen_over_head"):
+                self._draw_pen_hand()
             self._draw_left(now, f)
             # 연필 사각거림: 스트로크마다 클립 한 번 (짧은/긴 선 동일)
             if self.pensnd is not None and "pen" not in f:
@@ -2113,6 +2196,18 @@ class Mascot:
                     elif now - self._pen_release_t > 0.07:
                         self._pen_playing = False
 
+
+    def _draw_pen_hand(self):
+        """펜 쥔 손. 퀸시처럼 펜이 맨 위 레이어인 캐릭터는 머리를 그린 뒤 호출.
+
+        늘어나는 오른팔은 목도리 아래로 들어가야 하므로 여기서 그리지 않는다.
+        """
+        d = self._pen_draw
+        if not d:
+            return
+        px, py = d
+        self.canvas.create_image(px, py, image=self.im["arm_pen"], anchor="nw")
+        self._pen_draw = None
 
     def _draw_head(self, now, yo, pdx, pdy, blinking, smiling, sleeping):
         """머리 + 얼굴 (자는 중이면 목을 축으로 기울인 합성본)."""
@@ -2190,7 +2285,7 @@ class Mascot:
             self._settings_win.lift()
             return
         cd = self.card
-        PANEL, SOFT, LINE = "#fffdfe", "#fbf3f7", "#f0e6ec"
+        PANEL, SOFT, LINE = cd["panel"], cd["soft"], cd["line"]
         W, PAD, ROW, IN = 372, 20, 40, 18
         FONT = "Malgun Gothic"
         win = tk.Toplevel(self.root)
@@ -2224,6 +2319,20 @@ class Mascot:
             """캐릭터 귀 + 이름 헤더."""
             hx0, hx1 = PAD, W - PAD
             deco = cd.get("deco")
+            if deco == "scarf":                 # 퀸시: 귀 대신 목도리 띠
+                rrect(hx0 + 20, y - 6, hx1 - 20, y + 22, 10,
+                      fill=cd["border"], outline="")
+                span = (hx1 - hx0 - 96) / 4
+                for i in range(5):
+                    sx = hx0 + 56 + i * span
+                    cv.create_line(sx, y - 3, sx - 9, y + 20,
+                                   fill="#dfe5f0", width=4)
+                rrect(hx0, y + 10, hx1, y + 62, 18, fill=SOFT,
+                      outline=cd["border"], width=2)
+                cv.create_text(W / 2, y + 36,
+                               text=f"{self.cfg.get('name', self.char)} 설정",
+                               font=(FONT, 12, "bold"), fill=cd["text"])
+                return y + 78
             ec = {"cat": "#f5bdd2", "rose": "#f5bdd2"}.get(deco, "#2b2b2b")
             for ex in (hx0 + 34, hx1 - 34):
                 if deco == "cat":
