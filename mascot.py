@@ -473,14 +473,19 @@ def repair_parts(char_dir):
     repo = UPDATE_REPOS.get(os.path.basename(char_dir))
     if not (repo and getattr(sys, "frozen", False)):
         return                              # 개발 환경에서는 건드리지 않는다
-    if not _parts_broken(char_dir):
-        return
+    base_dir = os.path.dirname(char_dir)
+    done = os.path.exists(os.path.join(base_dir, "version.json"))
+    if done and not _parts_broken(char_dir):
+        return                              # 정상 — 네트워크 접근 없음
     import hashlib
+    import urllib.parse
     import urllib.request
-    base = os.path.dirname(char_dir)
+    base = base_dir
 
     def fetch(rel):
-        url = f"https://raw.githubusercontent.com/{repo}/main/{rel}"
+        # 공백이 든 음원 폴더 경로 때문에 URL 인코딩이 필요하다
+        url = (f"https://raw.githubusercontent.com/{repo}/main/"
+               f"{urllib.parse.quote(rel, safe='/')}")
         req = urllib.request.Request(url, headers={"User-Agent": "mascot-repair"})
         for i in range(3):
             try:
