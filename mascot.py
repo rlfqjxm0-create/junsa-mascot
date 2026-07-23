@@ -1031,6 +1031,7 @@ class Mascot:
         self.smile_until = 0.0       # 웃는 표정 종료 시각
         self.celebrate_until = 0.0   # 축하 연출 종료 시각
         self._fail = {}              # 구역별 실패 횟수 (3회면 그 구역만 끔)
+        self._sleeping = False       # 자는 중이면 프레임을 줄인다
         # 기록 갱신 축하 — '오늘'의 기준은 시각이 아니라 한 세션
         # (작업 시작 ~ '작업 종료' 버튼). 종료하면 새 세션으로 다시 센다.
         self.rec = {"strokes": [], "focus": 0.0}
@@ -2658,8 +2659,12 @@ class Mascot:
             self._log_error(where)
 
     def tick(self):
-        # 다음 프레임을 먼저 예약한다 — 중간에 예외가 나도 루프가 죽지 않게
-        self.root.after(33, self.tick)
+        # 다음 프레임을 먼저 예약한다 — 중간에 예외가 나도 루프가 죽지 않게.
+        # 입력이 없으면 볼 것도 없으므로 프레임을 낮춰 CPU를 아낀다.
+        # (자는 중 10fps / 5초 이상 무입력 15fps / 작업 중 30fps)
+        quiet = time.time() - max(self.last_key, self.last_pointer)
+        self.root.after(100 if self._sleeping else (66 if quiet > 5.0 else 33),
+                        self.tick)
         try:
             self._tick_body()
         except Exception:
@@ -2731,8 +2736,8 @@ class Mascot:
         deg = math.degrees(math.atan2(dx, dy) - math.atan2(nx, ny))
         key = (round(k * 25), round(deg))
         if key not in self._arm_cache:
-            if len(self._arm_cache) > 200:
-                self._arm_cache.clear()
+            if len(self._arm_cache) > 1500:
+                self._arm_cache.clear()      # 안전장치 (실측 포화 ~580개)
             w, h = self.arm_pil.size
             im = self.arm_pil.resize((w, max(8, round(h * k))), Image.LANCZOS)
             im = im.rotate(deg, expand=True, resample=self._resample())
@@ -2746,6 +2751,7 @@ class Mascot:
 
         idle = idle_seconds()
         sleeping = idle > max(float(self.us["sleep_min"]), 1) * 60 or f.get("sleep", False)
+        self._sleeping = sleeping        # tick의 프레임 간격 조절용
 
         if sleeping:
             breathe = math.sin(now * 1.1) * 2.5     # 자는 동안은 느리고 깊게
@@ -2913,10 +2919,13 @@ class Mascot:
             px, py = self._pos("arm_pen")
             btx, bty = self.pen_base_tip
             ddx, ddy = tx - btx, ty - bty
-            sx, sy = self.arm_top[0], self.arm_top[1] + yo * 0.5
+            # 숨쉬기(yo)는 팔 '모양' 계산에서 뺀다. 넣으면 프레임마다 각도·길이가
+            # 미세하게 달라져 팔 이미지를 끝없이 새로 만들게 된다(메모리 증가).
+            # 어깨가 1~2px 오르내리는 것은 그린 위치만 옮겨 표현한다.
+            sx, sy = self.arm_top
             hx_, hy_ = self.arm_bottom[0] + ddx, self.arm_bottom[1] + ddy
             arm_img = self._stretched_arm(hx_ - sx, hy_ - sy)
-            c.create_image((sx + hx_) / 2, (sy + hy_) / 2,
+            c.create_image((sx + hx_) / 2, (sy + hy_) / 2 + yo * 0.25,
                            image=arm_img, anchor="center")
             self._pen_draw = (px + ddx, py + ddy)
             if not self.cfg.get("pen_over_head"):
