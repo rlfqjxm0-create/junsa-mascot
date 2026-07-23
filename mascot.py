@@ -182,7 +182,10 @@ class ShadowLayer:
         ctypes.memmove(bits, data, len(data))
         old = g.SelectObject(mem, hbm)
         blend = _BLENDFUNCTION(0, 0, 255, 1)  # AC_SRC_OVER, alpha 채널 사용
-        u.UpdateLayeredWindow(self.hwnd, hdc, ctypes.byref(_POINT(0, 0)),
+        # 세 번째 인자는 '창을 옮길 새 화면 좌표'다. (0,0)을 넘기면 이미지를
+        # 바꿀 때마다 그림자 창이 화면 좌상단으로 튀어 사라진 것처럼 보인다.
+        # 위치를 바꿀 생각이 없으므로 NULL을 넘겨 그대로 둔다.
+        u.UpdateLayeredWindow(self.hwnd, hdc, None,
                               ctypes.byref(_SIZE(w, h)), mem,
                               ctypes.byref(_POINT(0, 0)), 0,
                               ctypes.byref(blend), 2)  # ULW_ALPHA
@@ -778,6 +781,137 @@ def repair_parts(char_dir, state_dir=None):
         pass                                # 오프라인이면 있는 그대로 실행
 
 
+class TodoPanel:
+    """캐릭터 왼쪽에 붙는 할 일 말풍선 창.
+
+    본체 창은 캐릭터 크기에 맞춰져 있어 옆으로 그릴 자리가 없다. 그래서
+    같은 색상키 투명을 쓰는 별도 창을 왼쪽에 두고 본체를 따라다니게 한다.
+    말풍선 왼쪽의 동그라미를 누르면 그 할 일이 사라진다.
+    """
+
+    W = 216                      # 패널 폭
+    PAD = 10                     # 말풍선 사이 간격
+    BOX = 18                     # 완료 동그라미 지름
+
+    def __init__(self, master, card, bg, on_done, on_move, offset=None):
+        self.card = card
+        self.on_done = on_done
+        self.on_move = on_move
+        # 본체 창 왼쪽 위 모서리 기준 상대 위치 (끌어서 옮기면 갱신·저장)
+        self.offset = tuple(offset) if offset else (-(self.W - 40), 0)
+        self.items = []          # [(원 좌표, 할 일 인덱스)]
+        self.top = tk.Toplevel(master)
+        self.top.overrideredirect(True)
+        self.top.attributes("-topmost", True)
+        if IS_MAC:
+            try:
+                self.top.attributes("-transparent", True)
+            except Exception:
+                pass
+        else:
+            self.top.attributes("-transparentcolor", bg)
+        self.top.config(bg=bg)
+        self.canvas = tk.Canvas(self.top, width=self.W, height=10, bg=bg,
+                                highlightthickness=0)
+        self.canvas.pack()
+        self.canvas.bind("<Button-1>", self._press)
+        self.canvas.bind("<B1-Motion>", self._drag)
+        self.canvas.bind("<ButtonRelease-1>", self._release)
+        self.top.withdraw()
+        self._pressed = None
+        self._moved = False
+
+    def _rrect(self, x0, y0, x1, y1, r, **kw):
+        pts = [x0 + r, y0, x1 - r, y0, x1, y0, x1, y0 + r, x1, y1 - r, x1, y1,
+               x1 - r, y1, x0 + r, y1, x0, y1, x0, y1 - r, x0, y0 + r, x0, y0]
+        return self.canvas.create_polygon(pts, smooth=True, **kw)
+
+    def render(self, todos):
+        """할 일을 위에서 아래로 쌓아 그린다. 창 높이도 함께 맞춘다."""
+        c, cd = self.canvas, self.card
+        c.delete("all")
+        self.items = []
+        if not todos:
+            self.top.withdraw()
+            return
+        tw = self.W - self.BOX - 34          # 글자가 들어갈 폭
+        heights = []                          # 먼저 줄바꿈 높이를 잰다
+        for text in todos:
+            t = c.create_text(0, 0, anchor="nw", text=text, width=tw,
+                              font=("Malgun Gothic", 9))
+            bb = c.bbox(t)
+            heights.append(max(bb[3] - bb[1] + 20, self.BOX + 14))
+            c.delete(t)
+
+        y = self.PAD
+        x0, x1 = self.BOX + 12, self.W - 6
+        for i, (text, h) in enumerate(zip(todos, heights)):
+            self._rrect(x0 + 2, y + 3, x1 + 2, y + h + 3, 12,
+                        fill="#e6e2e8", outline="")      # 그림자
+            self._rrect(x0, y, x1, y + h, 12, fill="#ffffff",
+                        outline=cd["border"], width=2)
+            mid = y + h / 2
+            t = c.create_text((x0 + x1) / 2, mid, text=text, width=tw,
+                              font=("Malgun Gothic", 9), fill=cd["text"],
+                              justify="center")
+            tb = c.bbox(t)          # 실제 그려진 높이로 세로 중앙을 다시 맞춘다
+            if tb:
+                c.move(t, 0, round(mid - (tb[1] + tb[3]) / 2) - 1)
+            cy, r = y + h / 2, self.BOX / 2
+            c.create_oval(6, cy - r, 6 + self.BOX, cy + r,
+                          fill="#ffffff", outline=cd["fill"], width=2)
+            c.create_line(11, cy, 14, cy + 4, 20, cy - 5,
+                          fill="#d5cfda", width=2, capstyle="round")
+            self.items.append(((6, cy - r, 6 + self.BOX, cy + r), i))
+            y += h + self.PAD
+        self.canvas.config(height=y)
+        self.top.geometry(f"{self.W}x{int(y)}")
+        self.top.deiconify()
+
+    def _press(self, e):
+        self._pressed = (e.x, e.y, e.x_root, e.y_root)
+        self._moved = False
+
+    def _drag(self, e):
+        """꾹 눌러 끌면 원하는 자리로 옮긴다."""
+        if self._pressed is None:
+            return
+        px, py, prx, pry = self._pressed
+        if not self._moved and abs(e.x_root - prx) + abs(e.y_root - pry) < 4:
+            return
+        self._moved = True
+        self.top.geometry(f"+{e.x_root - px}+{e.y_root - py}")
+
+    def _release(self, e):
+        if self._pressed is None:
+            return
+        if self._moved:
+            self.top.update_idletasks()      # 옮긴 좌표가 반영된 뒤 읽는다
+            self.on_move(self.top.winfo_rootx(), self.top.winfo_rooty())
+        else:
+            for (x0, y0, x1, y1), idx in self.items:
+                if x0 - 4 <= e.x <= x1 + 4 and y0 - 4 <= e.y <= y1 + 4:
+                    self.on_done(idx)
+                    break
+        self._pressed = None
+
+    def place(self, x, y):
+        """본체 창 기준 저장된 자리에 붙인다 (끌어서 옮긴 위치)."""
+        if self._moved and self._pressed is not None:
+            return                      # 끄는 중에는 건드리지 않는다
+        try:
+            dx, dy = self.offset
+            self.top.geometry(f"+{int(x + dx)}+{int(y + dy)}")
+        except Exception:
+            pass
+
+    def destroy(self):
+        try:
+            self.top.destroy()
+        except Exception:
+            pass
+
+
 class Mascot:
     def __init__(self, char_dir="parts", preview=False, state_dir=None):
         self.char_arg = char_dir
@@ -876,6 +1010,19 @@ class Mascot:
 
         self._tw_cache = {}          # 상태 텍스트 폭 캐시 (캔버스로 측정)
 
+        # ── 할 일 메모 (config의 "todo") ─────────────────────────────────
+        self.todo_on = bool(self.cfg.get("todo"))
+        self.todos = []
+        self.todo_pos = None         # 본체 기준 패널 위치 (끌어서 옮긴 자리)
+        self.todo_panel = None
+        self.todo_path = os.path.join(self.state_dir, ".todos.json")
+        if self.todo_on:
+            self._todo_load()
+            self.todo_panel = TodoPanel(self.root, self.card, bg,
+                                        self._todo_done, self._todo_moved,
+                                        self.todo_pos)
+            self.root.after(250, self._todo_refresh)   # 창 위치가 잡힌 뒤 배치
+
         # ── 귀여운 이벤트 (선물 캐릭터 전용 — config의 "fun") ────────────
         self.fun = bool(self.cfg.get("fun"))
         self.bubble = None           # (텍스트, 사라질 시각)
@@ -894,6 +1041,9 @@ class Mascot:
         self.shadow_img_type = None  # 타자 자세용 그림자 (깃펜 없음)
         self._shadow_base = None
         self._shadow_typing = False
+        self._shadow_want = False    # 바꾸고 싶은 상태 (아직 확정 전)
+        self._shadow_since = 0.0     # 그 상태가 유지된 시각
+        self._shadow_swap = 0.0      # 마지막으로 실제 교체한 시각
         self._pen_draw = None        # 펜 손을 머리 뒤에 그릴 때 쓰는 임시 보관
         self._pet_drawn = []         # 이번 프레임에 그린 반려동물 (그림자용)
         self._pet_sh_cache = {}
@@ -950,6 +1100,9 @@ class Mascot:
         self.canvas.bind("<B1-Motion>", self._on_drag)
         self.canvas.bind("<ButtonRelease-1>", self._on_release)
         menu = tk.Menu(self.root, tearoff=0)
+        if self.todo_on:
+            menu.add_command(label="할 일 추가", command=self.add_todo)
+            menu.add_separator()
         menu.add_command(label="환경설정", command=self.open_settings)
         if self.has_clock:
             menu.add_command(label="시계 펼치기 / 접기", command=self._toggle_clock)
@@ -1025,11 +1178,26 @@ class Mascot:
         solid = a.point(lambda v: 255 if v >= 128 else 0)
         # 반투명하게 그려진 '내부 선'(옅은 음영 등)은 살린다 — 주변이 대부분
         # 불투명하면 실루엣 안쪽이라는 뜻. 알파 0인 진짜 빈틈은 건드리지 않는다.
+        im = im.copy()
+        if not self.cfg.get("soft_inner"):
+            # 기본: 알파만 이분화한다. 반투명·투명한 안쪽을 억지로 불투명하게
+            # 만들면 그 자리의 어두운 색이 드러나 검은 얼룩이 된다
+            # (도로롱 머리카락 사건). 구멍 메우기도 같은 이유로 하지 않는다.
+            im.putalpha(solid)
+            return im
         near = solid.filter(ImageFilter.GaussianBlur(2))
         inner = ImageChops.multiply(
             a.point(lambda v: 255 if 0 < v < 128 else 0),
             near.point(lambda v: 255 if v >= 150 else 0))
-        im = im.copy()
+        if inner.getbbox():
+            # 그냥 불투명하게 만들면 옅게 그린 어두운 색이 진하게 드러나
+            # 검은 얼룩이 된다(도로롱 머리카락 사건). 주변 색 위에 그 알파로
+            # 얹은 결과로 바꿔, 원래 눈에 보이던 색을 유지한다.
+            rgb = im.convert("RGB")
+            base = rgb.filter(ImageFilter.GaussianBlur(4))
+            blended = Image.composite(rgb, base, a)
+            fixed = Image.composite(blended, rgb, inner)
+            im = Image.merge("RGBA", (*fixed.split(), im.getchannel("A")))
         im.putalpha(self._fill_holes(ImageChops.lighter(solid, inner)))
         return im
 
@@ -1588,6 +1756,106 @@ class Mascot:
                 self._on_poke()                        # 캐릭터를 콕 찌름
         self._press = None
 
+    def _todo_load(self):
+        try:
+            with open(self.todo_path, encoding="utf-8") as fp:
+                data = json.load(fp)
+            items = data if isinstance(data, list) else data.get("items", [])
+            self.todos = [str(t)[:200] for t in items if str(t).strip()][:20]
+            if isinstance(data, dict):
+                p = data.get("pos")
+                if isinstance(p, (list, tuple)) and len(p) == 2:
+                    self.todo_pos = (int(p[0]), int(p[1]))
+        except Exception:
+            self.todos = []
+
+    def _todo_save(self):
+        try:
+            with open(self.todo_path, "w", encoding="utf-8") as fp:
+                json.dump({"items": self.todos, "pos": self.todo_pos},
+                          fp, ensure_ascii=False)
+        except Exception:
+            pass
+
+    def _todo_moved(self, x, y):
+        """패널을 끌어서 옮기면 본체 기준 상대 위치로 기억한다."""
+        self.todo_pos = (int(x - self.root.winfo_rootx()),
+                         int(y - self.root.winfo_rooty()))
+        if self.todo_panel is not None:
+            self.todo_panel.offset = self.todo_pos
+        self._last_pos = None                # 다음 틱에 위치 재적용
+        self._todo_save()
+
+    def _todo_refresh(self):
+        if self.todo_panel is None:
+            return
+        self.todo_panel.render(self.todos)
+        self.todo_panel.place(self.root.winfo_rootx(), self.root.winfo_rooty())
+
+    def _todo_done(self, idx):
+        """완료 표시를 누르면 그 할 일이 사라진다."""
+        if 0 <= idx < len(self.todos):
+            del self.todos[idx]
+            self._todo_save()
+            self._todo_refresh()
+            if self.fun:
+                self._say(random.choice(["하나 끝!", "잘했어요!", "좋아요!"]), 2.5)
+
+    def add_todo(self):
+        """할 일 입력 창 — 엔터로 추가, Esc로 닫기. 연달아 여러 개 적을 수 있다."""
+        if getattr(self, "_todo_win", None) is not None                 and self._todo_win.winfo_exists():
+            self._todo_win.lift()
+            self._todo_win.focus_force()
+            return
+        cd = self.card
+        W, H = 300, 118
+        win = tk.Toplevel(self.root)
+        self._todo_win = win
+        win.title("할 일 추가")
+        win.attributes("-topmost", True)
+        win.resizable(False, False)
+        win.configure(bg=cd["panel"])
+        cv = tk.Canvas(win, width=W, height=H, bg=cd["panel"],
+                       highlightthickness=0)
+        cv.pack()
+
+        def rr(x0, y0, x1, y1, r, **kw):
+            pts = [x0 + r, y0, x1 - r, y0, x1, y0, x1, y0 + r, x1, y1 - r, x1, y1,
+                   x1 - r, y1, x0 + r, y1, x0, y1, x0, y1 - r, x0, y0 + r, x0, y0]
+            return cv.create_polygon(pts, smooth=True, **kw)
+
+        rr(14, 12, W - 14, 44, 12, fill=cd["soft"], outline=cd["border"], width=2)
+        cv.create_text(W / 2, 28, text="무엇을 할까요?",
+                       font=("Malgun Gothic", 10, "bold"), fill=cd["text"])
+        var = tk.StringVar()
+        ent = tk.Entry(win, textvariable=var, font=("Malgun Gothic", 10),
+                       relief="flat", bg="#ffffff", fg=cd["text"],
+                       highlightthickness=1, highlightbackground=cd["border"],
+                       highlightcolor=cd["fill"])
+        cv.create_window(20, 56, anchor="nw", window=ent, width=W - 40, height=26)
+        cv.create_text(W / 2, 100, text="엔터로 추가 · Esc로 닫기",
+                       font=("Malgun Gothic", 8), fill=cd["sub"])
+
+        def commit(_e=None):
+            text = var.get().strip()
+            if text:
+                self.todos.append(text[:200])
+                del self.todos[20:]
+                self._todo_save()
+                self._todo_refresh()
+                var.set("")
+            else:
+                win.destroy()
+
+        ent.bind("<Return>", commit)
+        win.bind("<Escape>", lambda _e: win.destroy())
+        win.update_idletasks()
+        sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+        px = min(max(self.root.winfo_rootx() - 40, 10), max(sw - W - 10, 10))
+        py = min(max(self.root.winfo_rooty() - 20, 10), max(sh - H - 60, 10))
+        win.geometry(f"+{int(px)}+{int(py)}")
+        ent.focus_force()
+
     def _on_poke(self):
         """캐릭터 클릭 반응 — 콩 튀고 한마디. (반응 파츠는 나중에 교체 가능)"""
         now = time.time()
@@ -1621,6 +1889,8 @@ class Mascot:
                 self._kb.stop()
             if self._ms is not None:
                 self._ms.stop()
+            if self.todo_panel is not None:
+                self.todo_panel.destroy()
         finally:
             self.root.destroy()
 
@@ -2419,11 +2689,19 @@ class Mascot:
             self.blink_until = now + 0.12
             self.next_blink = now + random.uniform(2.5, 5.5)
         # 그림자: 본체를 따라오고, 주기적으로 z순서(본체 바로 아래) 재고정
-        if self.shadow is not None:
+        # 창이 실제로 움직였을 때만 따라 옮긴다. 위치가 그대로인데도 주기적으로
+        # z순서를 다시 밀어넣으면 그림자가 눈에 띄게 깜빡인다.
+        if self.shadow is not None or self.todo_panel is not None:
             pos = (self.root.winfo_rootx(), self.root.winfo_rooty())
-            if pos != self._last_pos or now - self._z_check > 2.0:
+            if pos != self._last_pos:
                 self._last_pos = pos
                 self._z_check = now
+                if self.shadow is not None:
+                    self.shadow.place(*pos, self._main_hwnd)
+                if self.todo_panel is not None:
+                    self.todo_panel.place(*pos)
+            elif self.shadow is not None and now - self._z_check > 8.0:
+                self._z_check = now          # z순서만 가끔 재고정
                 self.shadow.place(*pos, self._main_hwnd)
         # 끝난 타자 소리 장치 정리
         if self.sndpack is not None and now - getattr(self, "_snd_reap", 0) > 2.0:
@@ -2488,10 +2766,18 @@ class Mascot:
         pen_typing = (now - self.last_pointer > 2.0) and (now - self.last_key < 1.8)
         if "pen" in f or f.get("type"):
             pen_typing = bool(f.get("type"))
-        # 타자 칠 때는 깃펜이 사라지므로 그 자리의 그림자도 같이 없앤다
-        if (self.shadow is not None and self.shadow_img_type is not None
-                and pen_typing != self._shadow_typing):
+        # 타자 칠 때는 깃펜이 사라지므로 그 자리의 그림자도 같이 없앤다.
+        # 다만 pen_typing은 마우스가 조금만 움직여도 뒤집히므로, 상태가
+        # 잠시 유지된 뒤에만 교체한다 (매번 바꾸면 그림자가 깜빡인다).
+        if pen_typing != self._shadow_want:
+            self._shadow_want = pen_typing
+            self._shadow_since = now
+        elif (self.shadow is not None and self.shadow_img_type is not None
+                and pen_typing != self._shadow_typing
+                and now - self._shadow_since > 0.5
+                and now - self._shadow_swap > 0.7):
             self._shadow_typing = pen_typing
+            self._shadow_swap = now
             self._shadow_base = self.shadow_img_type if pen_typing else self.shadow_img
             if not self._pet_sh_on:
                 self.shadow.set_image(self._shadow_base)
@@ -3136,6 +3422,15 @@ class Mascot:
             print("saved", name)
         self.close()
 
+    def _mac_log(self, text):
+        """맥 창 설정 진단 기록 — 초기화 중이라 _log_error를 못 쓰는 구간용."""
+        try:
+            with open(os.path.join(self.state_dir, ".macwindow.log"), "a",
+                      encoding="utf-8") as fp:
+                fp.write(time.strftime("%Y-%m-%d %H:%M:%S ") + text + os.linesep)
+        except Exception:
+            pass
+
     def _setup_mac_window(self):
         """맥 투명 창 설정. 방식별로 이미지가 보이는지 달라서 변형을 고를 수 있게 둔다."""
         mode = os.environ.get("MASCOT_MAC_MODE", "transparent")
@@ -3163,7 +3458,9 @@ class Mascot:
             self.root.attributes("-transparent", True)   # 기본
             self.root.config(bg="systemTransparent")
             return "systemTransparent"
-        except Exception:
+        except Exception as e:
+            # 여기서 조용히 #010203으로 떨어지면 맥에선 그냥 '검은 사각형'이 된다
+            self._mac_log(f"[{mode}] -transparent 실패 → {e!r}")
             return TRANSPARENT
 
     def _mac_borderless(self):
@@ -3177,17 +3474,26 @@ class Mascot:
         except Exception:
             pass
         try:                                   # 그래도 남으면 AppKit으로 직접
-            from AppKit import NSApp
+            from AppKit import NSApp, NSColor
             self.root.update_idletasks()
+            clear = NSColor.clearColor()
             for w in NSApp.windows():
                 try:
                     w.setStyleMask_(0)         # NSWindowStyleMaskBorderless
                     w.setHasShadow_(False)
                     w.setMovableByWindowBackground_(False)
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                    # styleMask를 바꾸면 창 프레임이 다시 만들어지면서 불투명으로
+                    # 되돌아간다(macOS 26에서 확인). 투명을 여기서 다시 못 박는다.
+                    if self.canvas_bg != "#808080":
+                        w.setOpaque_(False)
+                        w.setBackgroundColor_(clear)
+                except Exception as e:
+                    self._mac_log(f"창 설정 실패 → {e!r}")
+            states = [(bool(w.isOpaque()), str(w.backgroundColor().description())[:40])
+                      for w in NSApp.windows()]
+            self._mac_log(f"bg={self.canvas_bg!r} 창 상태(불투명?,배경색)={states}")
+        except Exception as e:
+            self._mac_log(f"AppKit 접근 실패 → {e!r}")
 
     def _dump_debug(self):
         """맥 진단용 상태 덤프 — 그림이 안 보일 때 원인 좁히기."""
