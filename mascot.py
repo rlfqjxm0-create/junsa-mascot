@@ -25,6 +25,7 @@ import math
 import os
 import random
 import sys
+import threading
 import time
 import tkinter as tk
 
@@ -732,6 +733,10 @@ class PenGrainSound:
             arr = (ctypes.c_int16 * len(s))(*s)
             self.shorts.append(bytes(arr))
         self.shorts.sort(key=len)
+        # 마우스 콜백(후킹 스레드)과 그리기 루프(메인)가 같이 보는 것들을 지킨다
+        self._lock = threading.Lock()
+        self._short_bufs = []            # [클립][볼륨단계] 미리 구운 재생 버퍼
+        self._tail_bufs = {}             # 볼륨별 루프 꼬리 버퍼
         self.set_volume(volume)
         self._voice = None               # 루프 재생 (handle, WAVEHDR, buf)
         self._playing = False            # 루프 재생 중인가
@@ -803,8 +808,37 @@ class PenGrainSound:
             out.extend(max(-32767, min(32767, int(v * g))) for v in seg)
         return out
 
+    GAIN_LEVELS = 3        # 속도별 볼륨 단계 (미리 구워 두는 가짓수)
+
     def set_volume(self, volume):
+        """볼륨을 바꾸고, 짧은 클립 재생용 버퍼를 미리 구워 둔다.
+
+        재생 시점(마우스 콜백)에 샘플마다 볼륨을 곱하면 후킹 스레드에서
+        1만 번짜리 반복이 돌아 입력이 밀린다. 미리 만들어 두고 고르기만 한다.
+        """
         self.volume = max(0.0, min(float(volume), 100.0))
+        base = self.volume / 100.0
+        self._short_bufs = []
+        self._tail_bufs = {}
+        if base <= 0.0:
+            return
+        for pcm in self.shorts:
+            row = []
+            for lv in range(self.GAIN_LEVELS):
+                g = base * (0.7 + 0.3 * (lv / max(1, self.GAIN_LEVELS - 1)))
+                row.append(_scaled_buffer(pcm, g, 2))
+            self._short_bufs.append(row)
+
+    def _tail_buf(self, gain):
+        """루프 꼬리 버퍼 (볼륨별 캐시). 메인 스레드에서만 만든다."""
+        key = round(gain, 2)
+        buf = self._tail_bufs.get(key)
+        if buf is None:
+            if len(self._tail_bufs) > 8:
+                self._tail_bufs.clear()
+            buf = _scaled_buffer(self._tail_pcm, key, 2)
+            self._tail_bufs[key] = buf
+        return buf
 
     # ── 마우스 콜백에서 즉시 호출 (그리기 루프를 기다리지 않는다) ──────────
     # 펜 소리가 그리기 루프에 묶여 있으면 프레임 간격(33~66ms)만큼 늦게 난다.
@@ -839,15 +873,14 @@ class PenGrainSound:
         self._last_ev = now
 
     def pen_up(self, now):
-        """펜을 뗀 순간 — 루프를 꼬리와 함께 끝낸다.
+        """펜을 뗀 순간 — 표시만 남기고, 루프 정지는 tick(메인 스레드)에 맡긴다.
 
-        짧은 클립은 이미 꼬리가 구워져 있어 건드리지 않는다. 여기서 볼륨을
-        건드리면 다음 획의 소리까지 같이 줄어든다(연타 씹힘의 원인).
+        여기서 직접 장치를 닫으면 같은 프레임에 tick도 닫으려 들어 같은
+        핸들을 두 번 닫는다(access violation → 팔 구역 차단·입력 지연 사고).
+        소리 장치를 여닫는 일은 메인 스레드만 하도록 못 박는다.
         """
         self._down = False
         self._stroke_fired = False
-        if self._playing:
-            self._stop_loop(tail=True)
 
     # ── 그리기 루프에서 호출 (루프 전환·정리) ──────────────────────────────
 
@@ -871,11 +904,16 @@ class PenGrainSound:
         cand = [i for i in pool if i != self._last_pick] or list(pool)
         i = random.choice(cand)
         self._last_pick = i
-        return self.shorts[i]
+        return i
 
-    def _oneshot(self, pcm, gain, fr2):
-        """버퍼 하나를 독립 장치로 재생하고 목록에 넣는다 (볼륨은 샘플에 반영)."""
-        buf = _scaled_buffer(pcm, gain, 2)
+    def _oneshot(self, buf, nbytes, fr2):
+        """이미 볼륨이 반영된 버퍼를 독립 장치로 재생한다.
+
+        마우스 콜백(후킹 스레드)에서도 불리므로 무거운 계산을 하지 않는다 —
+        볼륨 곱하기는 set_volume에서 미리 구워 둔다. 후킹 스레드가 늦어지면
+        윈도우가 시스템 전체의 펜/마우스 이벤트를 지연시켜, 그림 선이
+        직선으로 이어지고 타자가 굼떠지는 사고가 난다.
+        """
         wfx = _WAVEFORMATEX(1, 1, fr2, fr2 * 2, 2, 16, 0)
         wm = ctypes.windll.winmm
         h = ctypes.c_void_p()
@@ -884,33 +922,38 @@ class PenGrainSound:
         wm.waveOutSetVolume(h, 0xFFFFFFFF)   # 장치 볼륨은 만땅 고정 — 이후 안 건드린다
         hdr = _WAVEHDR()
         hdr.lpData = ctypes.cast(buf, ctypes.c_void_p)
-        hdr.dwBufferLength = len(pcm)
+        hdr.dwBufferLength = nbytes
         wm.waveOutPrepareHeader(h, ctypes.byref(hdr), ctypes.sizeof(_WAVEHDR))
         wm.waveOutWrite(h, ctypes.byref(hdr), ctypes.sizeof(_WAVEHDR))
-        self._oneshots.append((h, hdr, buf))
+        with self._lock:                     # 회수 목록은 메인 스레드와 공유
+            self._oneshots.append((h, hdr, buf))
 
     def _play_short(self, speed):
-        """짧은 클립 하나를 즉시 재생. 꼬리가 구워져 있어 뒤처리가 필요 없다."""
-        if not self.shorts:
+        """짧은 클립 하나를 즉시 재생 (미리 구워 둔 버퍼를 고르기만 한다)."""
+        if not self._short_bufs:
             return
+        i = self._pick_short(speed)
         g = max(0.0, min(1.0, (speed - 30.0) / 500.0))
-        gain = (self.volume / 100.0) * (0.7 + 0.3 * g)
+        lv = min(self.GAIN_LEVELS - 1, int(g * self.GAIN_LEVELS))
         fr2 = max(8000, int(self.fr * random.uniform(0.97, 1.06)))
-        self._oneshot(self._pick_short(speed), gain, fr2)
+        self._oneshot(self._short_bufs[i][lv], len(self.shorts[i]), fr2)
 
     def _reap(self):
-        """끝난 원샷(짧은 클립·루프 꼬리)을 회수한다."""
-        if not self._oneshots:
-            return
+        """끝난 원샷(짧은 클립·루프 꼬리)을 회수한다 (메인 스레드 전용)."""
+        with self._lock:
+            if not self._oneshots:
+                return
+            pending, self._oneshots = self._oneshots, []
         wm = ctypes.windll.winmm
         keep = []
-        for h, hdr, buf in self._oneshots:
+        for h, hdr, buf in pending:
             if hdr.dwFlags & 0x00000001:        # WHDR_DONE
                 wm.waveOutUnprepareHeader(h, ctypes.byref(hdr), ctypes.sizeof(_WAVEHDR))
                 wm.waveOutClose(h)
             else:
                 keep.append((h, hdr, buf))
-        self._oneshots = keep
+        with self._lock:                        # 회수 중 새로 들어온 것과 합친다
+            self._oneshots = keep + self._oneshots
 
     def _loop_buf(self, gain):
         """볼륨별 루프 본체 버퍼 (1.5초짜리라 매번 만들면 프레임을 잡아먹는다)."""
@@ -950,24 +993,35 @@ class PenGrainSound:
         hb.dwLoops = 0xFFFFFFFF
         wm.waveOutPrepareHeader(h, ctypes.byref(hb), ctypes.sizeof(_WAVEHDR))
         wm.waveOutWrite(h, ctypes.byref(hb), ctypes.sizeof(_WAVEHDR))
-        self._voice = (h, hh, hb, head_buf, body_buf)
-        self._playing = True
+        with self._lock:
+            self._voice = (h, hh, hb, head_buf, body_buf)
+            self._playing = True
 
     def _stop_loop(self, tail=True):
-        """루프를 멈춘다. tail이면 페이드아웃 꼬리를 따로 재생해 부드럽게 끝낸다."""
-        if self._voice is None:
+        """루프를 멈춘다. tail이면 페이드아웃 꼬리를 따로 재생해 부드럽게 끝낸다.
+
+        **핸들을 먼저 꺼내 놓고(_voice=None) 그 다음에 닫는다.** 반대로 하면
+        두 곳에서 동시에 들어왔을 때 같은 핸들을 두 번 닫아 access violation이
+        난다. 꺼내기를 원자적으로 하면 두 번 닫는 일이 구조적으로 불가능하다.
+        """
+        with self._lock:
+            voice, self._voice = self._voice, None
             self._playing = False
+        if voice is None:
             return
         wm = ctypes.windll.winmm
-        h, hh, hb, _hbuf, _bbuf = self._voice
-        wm.waveOutReset(h)                      # 무한 반복 중단
-        for hdr in (hh, hb):
-            wm.waveOutUnprepareHeader(h, ctypes.byref(hdr), ctypes.sizeof(_WAVEHDR))
-        wm.waveOutClose(h)
-        self._voice = None
-        self._playing = False
+        h, hh, hb, _hbuf, _bbuf = voice
+        try:
+            wm.waveOutReset(h)                  # 무한 반복 중단
+            for hdr in (hh, hb):
+                wm.waveOutUnprepareHeader(h, ctypes.byref(hdr),
+                                          ctypes.sizeof(_WAVEHDR))
+            wm.waveOutClose(h)
+        except Exception:
+            pass                                # 이미 닫혔어도 여기서 끝낸다
         if tail and self.volume > 0.0:          # 꼬리는 별도 장치 — 볼륨 간섭 없음
-            self._oneshot(self._tail_pcm, self._loop_gain, self._loop_fr)
+            buf = self._tail_buf(self._loop_gain)
+            self._oneshot(buf, len(self._tail_pcm), self._loop_fr)
 
     def stop(self):
         self._stop_loop(tail=False)
@@ -975,15 +1029,16 @@ class PenGrainSound:
     def close(self):
         """캐릭터 종료 시 — 재생 중인 것을 전부 정리한다."""
         self._stop_loop(tail=False)
+        with self._lock:
+            pending, self._oneshots = self._oneshots, []
         wm = ctypes.windll.winmm
-        for h, hdr, _b in self._oneshots:
+        for h, hdr, _b in pending:
             try:
                 wm.waveOutReset(h)
                 wm.waveOutUnprepareHeader(h, ctypes.byref(hdr), ctypes.sizeof(_WAVEHDR))
                 wm.waveOutClose(h)
             except Exception:
                 pass
-        self._oneshots = []
 
 
 class _MacSoundPool:

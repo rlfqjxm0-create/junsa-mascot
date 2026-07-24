@@ -1,7 +1,7 @@
 {
- "version": 1784929919,
+ "version": 1784934026,
  "files": {
-  "mascot.py": "e489a223d559b6736a8b2d77674b20dfded836af9ad619380e0a78ed8d491181",
+  "mascot.py": "9d88d115e1710791152ddae863b3e9019af2401e2eb6a1f7a3c7b69bfd262180",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -99,8 +99,7 @@
   "parts_junsa/sounds/tealios-v2_Akira/tab.wav": "0718e9c5b1311b80d3337617d28667297eee897fa56d3d5a1174b94071fbcbf6"
  },
  "notes": [
-  "켤 때마다 소품이 하나씩 랜덤으로 바뀌어요",
-  "무엇이 나올지는 켜 봐야 알 수 있어요",
-  "책상 디자인이 새로워졌어요"
+  "펜 소리 때문에 가끔 팔이 사라지던 문제를 고쳤어요",
+  "그림 선이 끊기거나 타자가 느려지던 것도 같이 해결됐어요"
  ]
 }
