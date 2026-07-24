@@ -1,17 +1,49 @@
 {
  "name": "준사",
  "scale": 0.34,
- "screen_quad": [[240, 1066], [490, 1060], [460, 1112], [215, 1090]],
+ "screen_quad": [
+  [
+   240,
+   1066
+  ],
+  [
+   490,
+   1060
+  ],
+  [
+   460,
+   1112
+  ],
+  [
+   215,
+   1090
+  ]
+ ],
  "blink": null,
  "trail_color": "#9fd8ff",
- "pen_tip": [37, 96],
- "arm_key_offset": [-32, 0],
+ "pen_tip": [
+  37,
+  96
+ ],
+ "arm_key_offset": [
+  -32,
+  0
+ ],
  "hard_alpha": true,
- "timer": {"enabled": true, "idle_sec": 15},
+ "timer": {
+  "enabled": true,
+  "idle_sec": 15
+ },
  "fun": true,
  "hat_scale": 0.24,
- "hat_pos": [-56, 66],
- "nose": [508, 788],
+ "hat_pos": [
+  -56,
+  66
+ ],
+ "nose": [
+  508,
+  788
+ ],
  "pet_scale": 1.3,
  "pet_rot": -10,
  "pet_front": true,
@@ -19,7 +51,14 @@
  "pet_dx": 60,
  "pet_variants": true,
  "skins": [
-  {"name": "기본", "dir": ""},
-  {"name": "메이드복", "dir": "skins/maid"}
- ]
+  {
+   "name": "기본",
+   "dir": ""
+  },
+  {
+   "name": "메이드복",
+   "dir": "skins/maid"
+  }
+ ],
+ "pen_grain": true
 }

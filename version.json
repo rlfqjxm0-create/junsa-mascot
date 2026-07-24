@@ -1,13 +1,13 @@
 {
- "version": 1784820076,
+ "version": 1784928062,
  "files": {
-  "mascot.py": "421b1ce2123e0a242e34a437948810107cfad1167f1c634aae7875b47595ff65",
+  "mascot.py": "2404386dbb65a43d9d99d5bf63878ace3302f9833e99fef22437256944811ca5",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "69d1c8ef4a89c79257607503776947e0c1190a0d694b4bfefcf6add44dd842d3",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
   "parts_junsa/arm_right_typing.png": "d3da01f7573f7078ec82316e7b7c3bf7e1d99123bcf02b15bec14ac92eee13c0",
   "parts_junsa/body_open.png": "a95f2555907c3a0d7e57dc71df1ed44f9b7cfa1d321071e82f4cca5c011fa669",
-  "parts_junsa/config.json": "6bca5d233294b47a939c754a43d18cba9c3e9c74e752d9acb645f653722b7476",
+  "parts_junsa/config.json": "12365d42c70577fab2dadf81737270232c777f77a7b06271eca24180010a4279",
   "parts_junsa/desk.png": "bb85529f6390542f3df3f584691bb42b9b8302f9f7b7ca5f10fd05cc9d5ce1b5",
   "parts_junsa/eyes_closed.png": "fd094c16062b4d1af4274220b785fc748195ebc406bffe2673e82d3978f09e15",
   "parts_junsa/hair.png": "3d23e3c2e207b1c5d71dfebf13514aad842faf1599c708244fb4ddaae931a3ba",
@@ -68,9 +68,13 @@
   "parts_junsa/sounds/mx-speed-silver/mx-speed-silver-4.wav": "26d49b823ecc46ce057aee649484f39cb13a4e242e72a20855c3a8bfad2581f8",
   "parts_junsa/sounds/mx-speed-silver/mx-speed-silver-5.wav": "c2fffe2e89be7f1239f95f7063bceddbef4d7c7730fe4aa94c88e34139f37b51",
   "parts_junsa/sounds/mx-speed-silver/mx-speed-silver-6.wav": "2b2dc0ababab084ebc7b9d62a8eaeaefa19c4af8d0bb67172fc486be7d277011",
-  "parts_junsa/sounds/pen/clip_1.wav": "470c5a7048d9fcbfd7c0874a8bf8ed40a7bb155cc94468779b8d3a11779b5bab",
-  "parts_junsa/sounds/pen/clip_2.wav": "1ced3e4dd195e23dfd3c4b4d60a51e178727db0b168eb25c03e3910def713107",
-  "parts_junsa/sounds/pen/clip_3.wav": "c64e63b791c1be84aee9f17deb933676eb0dcf32b8e413866c95c9668198976a",
+  "parts_junsa/sounds/pen/clip_1.wav": "aba157ef543fcecfaf25b91f4c2da91b85a09875291e01a0ff55a4fd787c3b46",
+  "parts_junsa/sounds/pen/clip_2.wav": "399b26f1cdc53d95916a967913f88ad34ade453dda08ddbc4bd137b09eb1fdd8",
+  "parts_junsa/sounds/pen/clip_3.wav": "2053da15a8eab5a95b697532233b3eff3ca6a8d9830c00637c110935581d476f",
+  "parts_junsa/sounds/pen/clip_4.wav": "943cc4b728bdb1bea1f0404e3000a710e4d73f9c0183b2efb606b5305e2fbd73",
+  "parts_junsa/sounds/pen/clip_5.wav": "52237409b942b76ba313bd20bb8b3222b40a8a87fd33f941c7fd2485b8aa35c8",
+  "parts_junsa/sounds/pen/clip_6.wav": "ffdb7c929f56e1f27bca1322413e3355497e013248727ccbe940965686b6144e",
+  "parts_junsa/sounds/pen/sustain.wav": "8d6c2a284c4c9c03ce58e97fdb3f8ca2f6a930be01173e7b32987ca8fa5815d8",
   "parts_junsa/sounds/Razer Huntman TE - Revolt/config.json": "dd89574e8f02bf832a9fd0e77248a52f0f86fbc4aafca2abf3ea8c4b759fa0f1",
   "parts_junsa/sounds/Razer Huntman TE - Revolt/Razer huntman TE.wav": "a9d8bc23f71821e4cdb7212c37275d9f0fc66d9c285e55e13d6829b7f7b438e1",
   "parts_junsa/sounds/tealios-v2_Akira/back.wav": "72c5142e29793443f094aad7be3401059752bb956187b58e9c0e145a65937301",
@@ -88,5 +92,10 @@
   "parts_junsa/sounds/tealios-v2_Akira/shift.wav": "96ba5efe7c5b612c480d8f1193eeb8fc7a006208badac0a36c0858423b19c9ec",
   "parts_junsa/sounds/tealios-v2_Akira/space.wav": "b47b8e94ff0882a8793322ea6275d6447d9bc7f8de2a88791c9631d1164426ba",
   "parts_junsa/sounds/tealios-v2_Akira/tab.wav": "0718e9c5b1311b80d3337617d28667297eee897fa56d3d5a1174b94071fbcbf6"
- }
+ },
+ "notes": [
+  "펜 긋는 소리가 실제 연필 녹음으로 바뀌었어요",
+  "짧게 그으면 짧게, 길게 그으면 길게 이어집니다",
+  "그냥 톡 누르기만 할 때는 소리가 나지 않아요"
+ ]
 }
