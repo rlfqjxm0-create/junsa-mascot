@@ -1747,6 +1747,9 @@ class Mascot:
                      "strokes": 0, "best": 0.0, "_run": 0.0,
                      "first": 0.0, "last": 0.0}
 
+        self.prop_name = None        # 이번 실행에 뽑힌 소품 (_load_parts가 채움)
+        self.prop_dir = self.parts_dir   # 소품 PNG를 읽을 폴더
+        self._prop_layout = self.layout  # 소품 좌표가 든 layout
         self._load_parts()
 
         # ── 상태 ──────────────────────────────────────────────────────────
@@ -1928,6 +1931,58 @@ class Mascot:
         holes = pad.point(lambda v: 255 if v == 0 else 0).crop((1, 1, w + 1, h + 1))
         return ImageChops.lighter(solid, holes)
 
+    @staticmethod
+    def _props_in(layout, folder):
+        """layout과 실제 PNG가 둘 다 있는 소품 이름들 (자동업데이트 섞임 대비)."""
+        return sorted(n for n in layout
+                      if n.startswith("prop") and n != "prop"
+                      and os.path.exists(os.path.join(folder, f"{n}.png")))
+
+    def _pick_prop(self):
+        """이번 실행에 쓸 소품 하나를 고른다 (없으면 None).
+
+        같은 게 연달아 나오지 않도록, 한 바퀴 다 돌 때까지 쓴 것을 빼고
+        고른다. 다 쓰면 초기화하되 직전 것만 제외해 연속 중복을 막는다.
+        기록은 상태 폴더에 남겨 자동 업데이트로 지워지지 않게 한다.
+        """
+        # 패션 슬롯에 소품이 없으면 기본 폴더 것을 쓴다 — 소품은 얼굴 위
+        # 덮개라 슬롯(옷)이 바뀌어도 좌표가 같다.
+        self.prop_dir, src = self.parts_dir, self.layout
+        avail = self._props_in(self.layout, self.parts_dir)
+        if not avail and self.parts_dir != self.dir:
+            try:
+                with open(os.path.join(self.dir, "layout.json"),
+                          encoding="utf-8") as fp:
+                    base = json.load(fp)
+                hit = self._props_in(base, self.dir)
+            except Exception:
+                hit = []
+            if hit:
+                self.prop_dir, src, avail = self.dir, base, hit
+        if not avail:
+            return None
+        self._prop_layout = src
+        path = os.path.join(self.state_dir, ".props.json")
+        used, last = [], None
+        try:
+            with open(path, encoding="utf-8") as fp:
+                d = json.load(fp)
+            used = [str(x) for x in (d.get("used") or []) if x in avail]
+            last = d.get("last")
+        except Exception:
+            pass
+        pool = [n for n in avail if n not in used]
+        if not pool:                       # 한 바퀴 다 돎 — 직전 것만 빼고 재시작
+            used = []
+            pool = [n for n in avail if n != last] or avail
+        pick = random.choice(pool)
+        try:
+            with open(path, "w", encoding="utf-8") as fp:
+                json.dump({"used": used + [pick], "last": pick}, fp)
+        except Exception:
+            pass
+        return pick
+
     def _load_parts(self):
         s = self.s
 
@@ -1952,6 +2007,27 @@ class Mascot:
             if self.has[name]:
                 pil_cache[name] = load_pil(name)
                 self.im[name] = ImageTk.PhotoImage(pil_cache[name])
+
+        # 소품(prop1..N) — 켤 때마다 하나만 랜덤으로. 고른 것을 "prop"으로
+        # 이름 붙여 두면 overlays 순서대로 얼굴 위에 함께 그려진다.
+        self.has["prop"] = False
+        pick = self._pick_prop()
+        if pick:
+            self.layout["prop"] = self._prop_layout[pick]
+            im = Image.open(os.path.join(self.prop_dir,
+                                         f"{pick}.png")).convert("RGBA")
+            if s != 1.0:
+                im = im.resize((max(1, round(im.width * s)),
+                                max(1, round(im.height * s))), Image.LANCZOS)
+            pil_cache["prop"] = self._hard(im)
+            self.im["prop"] = ImageTk.PhotoImage(pil_cache["prop"])
+            self.has["prop"] = True
+            self.prop_name = pick
+            if "prop" not in (self.layout.get("overlays") or []):
+                # 슬롯 layout이 소품을 모르면(옷만 바꾼 슬롯) 머리카락 앞에 끼운다
+                ov = list(self.layout.get("overlays") or [])
+                ov.insert(ov.index("hair") if "hair" in ov else len(ov), "prop")
+                self.layout["overlays"] = ov
 
         # 타이머 카드 가로 중심 = 책상 내용의 중심 (캔버스 중심이 아니라)
         self.card_cx = self.W / 2

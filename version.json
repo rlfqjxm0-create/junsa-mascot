@@ -1,22 +1,27 @@
 {
- "version": 1784928062,
+ "version": 1784929106,
  "files": {
-  "mascot.py": "2404386dbb65a43d9d99d5bf63878ace3302f9833e99fef22437256944811ca5",
+  "mascot.py": "e489a223d559b6736a8b2d77674b20dfded836af9ad619380e0a78ed8d491181",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
-  "parts_junsa/arm_pen.png": "69d1c8ef4a89c79257607503776947e0c1190a0d694b4bfefcf6add44dd842d3",
+  "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
   "parts_junsa/arm_right_typing.png": "d3da01f7573f7078ec82316e7b7c3bf7e1d99123bcf02b15bec14ac92eee13c0",
   "parts_junsa/body_open.png": "a95f2555907c3a0d7e57dc71df1ed44f9b7cfa1d321071e82f4cca5c011fa669",
   "parts_junsa/config.json": "12365d42c70577fab2dadf81737270232c777f77a7b06271eca24180010a4279",
-  "parts_junsa/desk.png": "bb85529f6390542f3df3f584691bb42b9b8302f9f7b7ca5f10fd05cc9d5ce1b5",
+  "parts_junsa/desk.png": "a708b97f57aa13db4d2a164e2687537c148085628f7c2497dd51448785754e93",
   "parts_junsa/eyes_closed.png": "fd094c16062b4d1af4274220b785fc748195ebc406bffe2673e82d3978f09e15",
   "parts_junsa/hair.png": "3d23e3c2e207b1c5d71dfebf13514aad842faf1599c708244fb4ddaae931a3ba",
   "parts_junsa/hat.png": "4bd1da80b760cff3694c7b21350e8dce6a177026846dcd737d796ad7560f277f",
   "parts_junsa/head.png": "12b8d27857a0cf5354776fd7dd8c23ae2d9cd245eb35eddb9fc0919a2cd869bc",
   "parts_junsa/lashes.png": "aea2649410308f66078d48f3d3580a523ba1cea34252c75aee8e9ef65d6d7ab8",
-  "parts_junsa/layout.json": "f2b6039495199bcd6f5fa7ff204e69da68adeb0e003ecab6931f78856535f649",
+  "parts_junsa/layout.json": "1741ef1b7371386e73392b533f652ac608cf6ede0e6f88b6c42bcf96b225238d",
   "parts_junsa/pet1.png": "ccf3ec92d18fe787212a98d1a1bbc0b70383d565332d5f95dbe5de4cf14e13b2",
   "parts_junsa/pet2.png": "664cde3775e26d09b22534a5e995bf9c1e7e4e1040396553ec3ef7c9ec1fd243",
+  "parts_junsa/prop1.png": "c6c932bcbd39f1a7052d9741c8b040135ff46af612bd21a17e9ce29e798c88db",
+  "parts_junsa/prop2.png": "9bc9d054486d8bae5265b8e32578f2775e46a282454d2507d7928bca65e2f139",
+  "parts_junsa/prop3.png": "c747b74d6f50d0a99ff15c96512b0fc53865a8796d88df9686442df5a1df7f97",
+  "parts_junsa/prop4.png": "32c2dc907ceff321fc76755798a8cf69bda1d1f5c5c54ffd5e697309542e38fe",
+  "parts_junsa/prop5.png": "3d1606bffed33ba36d0c8e9cf31641ea44d720c6a6a18f345454150333e643da",
   "parts_junsa/pupils.png": "942f010b921cfe0c4f4e8b22a7d8685c8139ee78c29f07ec835ee07cc04aaec9",
   "parts_junsa/smile.png": "32a7d28a8880324facfa0ffd981fada92264a3992624024f2ab15e40f7f2493f",
   "parts_junsa/skins/maid/arm_key.png": "71ab8354f193f93d34cc590ea26e7be6ee2f23535db9a6ffaac5bb00fed814b3",
@@ -94,8 +99,8 @@
   "parts_junsa/sounds/tealios-v2_Akira/tab.wav": "0718e9c5b1311b80d3337617d28667297eee897fa56d3d5a1174b94071fbcbf6"
  },
  "notes": [
-  "펜 긋는 소리가 실제 연필 녹음으로 바뀌었어요",
-  "짧게 그으면 짧게, 길게 그으면 길게 이어집니다",
-  "그냥 톡 누르기만 할 때는 소리가 나지 않아요"
+  "켤 때마다 소품이 하나씩 랜덤으로 바뀌어요",
+  "안경, 새싹, 식빵, 뼈, 메롱 다섯 가지가 있어요",
+  "준사 책상 디자인이 새로워졌어요"
  ]
 }
