@@ -1,7 +1,7 @@
 {
- "version": 1784972150,
+ "version": 1785013685,
  "files": {
-  "mascot.py": "db1dedf1159b7dd3038abbcfe6f86c4e92552fd91cf670fdf640dc34b53ab773",
+  "mascot.py": "9a47691ccbc7dd08d878267c56c84ad054375f5207b753cf90fcf87ffb375b2f",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -100,7 +100,7 @@
   "parts_junsa/sounds/tealios-v2_Akira/tab.wav": "0718e9c5b1311b80d3337617d28667297eee897fa56d3d5a1174b94071fbcbf6"
  },
  "notes": [
-  "환경설정에서 타이머 글자 크기를 조절할 수 있어요",
-  "할 일 목록이 화면을 덜 가리고 글자는 커졌어요"
+  "우클릭 메뉴·환경설정·작업 종료 화면의 글자가 화면 배율에 맞게 나옵니다.",
+  "할 일 목록 말풍선을 우클릭하면 '크기 조절'로 목록 크기를 바꿀 수 있습니다."
  ]
 }
