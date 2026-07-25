@@ -1,7 +1,7 @@
 {
- "version": 1784970146,
+ "version": 1784971281,
  "files": {
-  "mascot.py": "d010418f3ab03a82a4ebc08d833ec3a62447c8b9d157064e9cd5f91d9e473311",
+  "mascot.py": "0c7eae3f975e463b600f99564cb38af2346aaba7aa6a5acde60d7a326cfc12ae",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -100,7 +100,7 @@
   "parts_junsa/sounds/tealios-v2_Akira/tab.wav": "0718e9c5b1311b80d3337617d28667297eee897fa56d3d5a1174b94071fbcbf6"
  },
  "notes": [
-  "화면 배율이 큰 컴퓨터에서 타이머 글자가 겹치던 문제를 고쳤어요",
-  "혼잣말이 너무 자주 나오지 않게 간격을 늘렸어요"
+  "환경설정에서 글자 크기를 조절할 수 있어요",
+  "화면 배율이 큰 컴퓨터에서 글자가 겹치던 문제도 고쳤어요"
  ]
 }
