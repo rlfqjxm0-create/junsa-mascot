@@ -60,5 +60,6 @@
    "dir": "skins/maid"
   }
  ],
- "pen_grain": true
+ "pen_grain": true,
+ "todo": true
 }
