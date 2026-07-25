@@ -1,5 +1,5 @@
 {
- "version": 1784955295,
+ "version": 1784964457,
  "files": {
   "mascot.py": "2e905a09bd1ed5f95ee720d7d631c4367c4acf69dd0a64a928ee017d162a9a98",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
@@ -7,7 +7,7 @@
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
   "parts_junsa/arm_right_typing.png": "d3da01f7573f7078ec82316e7b7c3bf7e1d99123bcf02b15bec14ac92eee13c0",
   "parts_junsa/body_open.png": "a95f2555907c3a0d7e57dc71df1ed44f9b7cfa1d321071e82f4cca5c011fa669",
-  "parts_junsa/config.json": "d63c550e5f285c84ff6c0bf7b39cc67f34cb7c17843dfca6b286cecc4d7a3667",
+  "parts_junsa/config.json": "789f44354f08e9c41a861fb4a934526339948cd105f0d98628a2dfe0b19c87f5",
   "parts_junsa/desk.png": "a708b97f57aa13db4d2a164e2687537c148085628f7c2497dd51448785754e93",
   "parts_junsa/eyes_closed.png": "fd094c16062b4d1af4274220b785fc748195ebc406bffe2673e82d3978f09e15",
   "parts_junsa/hair.png": "3d23e3c2e207b1c5d71dfebf13514aad842faf1599c708244fb4ddaae931a3ba",
@@ -99,7 +99,7 @@
   "parts_junsa/sounds/tealios-v2_Akira/tab.wav": "0718e9c5b1311b80d3337617d28667297eee897fa56d3d5a1174b94071fbcbf6"
  },
  "notes": [
-  "할 일 우클릭이 가끔 설정 창을 열던 문제를 고쳤어요",
-  "크기를 줄여도 타이머 카드가 안 잘려요"
+  "혼잣말이 훨씬 다양해졌어요",
+  "무슨 말을 할지는 지켜봐 주세요"
  ]
 }
