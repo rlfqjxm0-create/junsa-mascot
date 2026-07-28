@@ -1,13 +1,13 @@
 {
- "version": 1785051795,
+ "version": 1785260142,
  "files": {
-  "mascot.py": "37efeee5cfadde6413de6c3b02dd4dfb4f1adab0748e57f9b4e8753932129cd8",
+  "mascot.py": "898d604752627f3e02c8c6d0d279d3aa1f987aec629b9201863ae4972e1b0bbc",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
   "parts_junsa/arm_right_typing.png": "d3da01f7573f7078ec82316e7b7c3bf7e1d99123bcf02b15bec14ac92eee13c0",
   "parts_junsa/body_open.png": "a95f2555907c3a0d7e57dc71df1ed44f9b7cfa1d321071e82f4cca5c011fa669",
-  "parts_junsa/config.json": "abc0023d0579635d2aead1e0aaa42071de4eeb0603cc1cf2c1cae0174087c083",
+  "parts_junsa/config.json": "254da3dc91f8e9555cf40649d930874f22949c5bead6f566d2640480b6e2ade8",
   "parts_junsa/desk.png": "a708b97f57aa13db4d2a164e2687537c148085628f7c2497dd51448785754e93",
   "parts_junsa/eyes_closed.png": "fd094c16062b4d1af4274220b785fc748195ebc406bffe2673e82d3978f09e15",
   "parts_junsa/hair.png": "3d23e3c2e207b1c5d71dfebf13514aad842faf1599c708244fb4ddaae931a3ba",
@@ -100,7 +100,7 @@
   "parts_junsa/sounds/tealios-v2_Akira/tab.wav": "0718e9c5b1311b80d3337617d28667297eee897fa56d3d5a1174b94071fbcbf6"
  },
  "notes": [
-  "20분마다 기지개를 켜며 스트레칭을 권합니다.",
-  "동작 중 문제가 생겨도 캐릭터가 멈추거나 사라지지 않도록 보완했습니다."
+  "스트레칭 알림은 캐릭터를 한 번 눌러야 꺼집니다. 누를 때까지 기다려요.",
+  "리듬 타는 모습이 더 자주 나옵니다."
  ]
 }
