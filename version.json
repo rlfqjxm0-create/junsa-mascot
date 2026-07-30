@@ -1,13 +1,13 @@
 {
- "version": 1785446157,
+ "version": 1785447021,
  "files": {
-  "mascot.py": "fee8f7d0237e20a3ea45c05c09765c4e2e85229933f660974453d107413b4645",
+  "mascot.py": "6928bfd7feeb4d9567fb9b724e2bb91f0eb2f3ebd1198e24d5491683f7cbef87",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
   "parts_junsa/arm_right_typing.png": "d3da01f7573f7078ec82316e7b7c3bf7e1d99123bcf02b15bec14ac92eee13c0",
   "parts_junsa/body_open.png": "a95f2555907c3a0d7e57dc71df1ed44f9b7cfa1d321071e82f4cca5c011fa669",
-  "parts_junsa/config.json": "5d002cc1132c13c39fd94173806e9a5aa7d421bb323986adc0d124813c60f9ba",
+  "parts_junsa/config.json": "812d21047df1dc1f5d8c7edd0335562f018484684b074a86f5fa4736282a7339",
   "parts_junsa/desk.png": "a708b97f57aa13db4d2a164e2687537c148085628f7c2497dd51448785754e93",
   "parts_junsa/eyes_closed.png": "fd094c16062b4d1af4274220b785fc748195ebc406bffe2673e82d3978f09e15",
   "parts_junsa/hair.png": "3d23e3c2e207b1c5d71dfebf13514aad842faf1599c708244fb4ddaae931a3ba",
@@ -118,10 +118,7 @@
   "parts_junsa/sounds/tealios-v2_Akira/tab.wav": "0718e9c5b1311b80d3337617d28667297eee897fa56d3d5a1174b94071fbcbf6"
  },
  "notes": [
-  "마감을 말풍선으로 여러 개 등록할 수 있습니다. 우클릭 → 마감 추가.",
-  "작업 종료 브리핑에 어제·최근 7일·연속 일수가 나오고, 그림으로 저장할 수 있습니다.",
-  "목표 시간을 채우면 축하해 줍니다. 캐릭터 위치도 기억합니다.",
-  "눈·머리카락이 거칠게 보이던 문제를 고쳤습니다.",
-  "모니터가 여러 대면 펜을 따라갈 화면을 고를 수 있습니다."
+  "작업 종료 브리핑에 캐릭터 이름과 날짜가 표시됩니다.",
+  "어제 대비와 연속 일수가 잘못 세어지던 문제를 고쳤습니다."
  ]
 }
