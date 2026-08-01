@@ -1,7 +1,7 @@
 {
- "version": 1785566331,
+ "version": 1785575433,
  "files": {
-  "mascot.py": "b5a0e79a81f19364fb2494e847cad9ce95a541ae529864060fe5bd300663f6f8",
+  "mascot.py": "48ccf6cd106b4ed45e04d6322e5b5a4646ed98667430bcc91b7e426223b30909",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -118,7 +118,6 @@
   "parts_junsa/sounds/tealios-v2_Akira/tab.wav": "0718e9c5b1311b80d3337617d28667297eee897fa56d3d5a1174b94071fbcbf6"
  },
  "notes": [
-  "스트레칭 알림 간격을 직접 고를 수 있어요. 환경설정 → 타이머 → '스트레칭 알림'",
-  "끄기 · 10 · 20 · 30 · 45 · 60 · 90분 중에서 고르면 됩니다."
+  "설정 창이 길어지면 스크롤로 볼 수 있어요. 저장 버튼은 늘 아래에 있습니다."
  ]
 }
