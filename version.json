@@ -1,7 +1,7 @@
 {
- "version": 1785566112,
+ "version": 1785566331,
  "files": {
-  "mascot.py": "bce1563ca4f4b07f6d4c7751717075d09e0e92d3232ac303ed3972a784e62359",
+  "mascot.py": "b5a0e79a81f19364fb2494e847cad9ce95a541ae529864060fe5bd300663f6f8",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -119,7 +119,6 @@
  },
  "notes": [
   "스트레칭 알림 간격을 직접 고를 수 있어요. 환경설정 → 타이머 → '스트레칭 알림'",
-  "끄기 · 10 · 20 · 30 · 45 · 60 · 90분 중에서 고르면 됩니다.",
-  "20분마다는 집중이 끊긴다는 건의 덕분에 생긴 기능이에요. 고마워요!"
+  "끄기 · 10 · 20 · 30 · 45 · 60 · 90분 중에서 고르면 됩니다."
  ]
 }
