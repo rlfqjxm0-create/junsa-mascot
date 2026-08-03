@@ -1,7 +1,7 @@
 {
- "version": 1785752799,
+ "version": 1785792218,
  "files": {
-  "mascot.py": "a7976f4019a036f9d427657b2df330441e087c117f81b25441017ec142d03a03",
+  "mascot.py": "21b7f08b248e64ebb8da9a491387d88601c8257d9a1edeac9c32fec63b5a8487",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -193,6 +193,6 @@
   "parts_junsa/sounds/tealios-v2_Akira/tab.wav": "0718e9c5b1311b80d3337617d28667297eee897fa56d3d5a1174b94071fbcbf6"
  },
  "notes": [
-  "말풍선이 캐릭터를 따라오지 않던 문제를 고쳤어요."
+  "캐릭터를 작게 쓸 때 고개를 돌리면 머리만 옆으로 어긋나던 문제를 고쳤어요."
  ]
 }
