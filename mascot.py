@@ -2274,6 +2274,12 @@ class Mascot:
             spot = self.layout.get(name)
             if isinstance(spot, dict) and spot.get("pos"):
                 spot["pos"] = [spot["pos"][0] + off[0], spot["pos"][1] + off[1]]
+        # 펜이 닿는 영역은 책상 그림에 붙은 값이라, 옷마다 책상 자리가
+        # 조금 다르면 옷별로 따로 둬야 한다 (안 그러면 그 옷에서만 펜이 밀린다).
+        # skins 항목의 screen_quad가 있으면 그것을 쓰고, 없으면 공용 값.
+        self._quad_src = (self.skins[idx].get("screen_quad")
+                          if self.skin_name == self.skin_names[idx] else None) \
+            or self.cfg["screen_quad"]
 
         s = self.s = float(self.cfg.get("scale", 1.0)) * self.us["scale_pct"] / 100.0
         self.timer_on = bool(tcfg.get("enabled")) \
@@ -2495,9 +2501,10 @@ class Mascot:
         self.prop_dir = self.parts_dir   # 소품 PNG를 읽을 폴더
         self._prop_layout = self.layout  # 소품 좌표가 든 layout
         self._back_cache = {}        # 몸 뒤 파츠 움직임 프레임 (칸별로만 만든다)
-        self._back_phase = 0.0       # 움직임 위상 0~1
-        self._back_last = 0.0        # 직전 프레임 시각 (위상 적분용)
-        self._back_period = float(self.cfg.get("back_period", 2.6))
+        # 파츠별 움직임 상태 — 기뽀처럼 기본 날개와 소품 날개가 같이 있을 때
+        # 서로 다른 박자로 움직이도록 이름별로 따로 든다
+        self._back_st = {}
+        self._prop_back_cfg = {}     # 뽑힌 소품의 뒤쪽 조각 움직임 설정
         self._load_parts()
 
         # ── 상태 ──────────────────────────────────────────────────────────
@@ -2752,11 +2759,53 @@ class Mascot:
         holes = pad.point(lambda v: 255 if v == 0 else 0).crop((1, 1, w + 1, h + 1))
         return ImageChops.lighter(solid, holes)
 
+    # 뒤쪽 조각의 기본 움직임 — config의 prop_back으로 캐릭터마다 덮어쓴다
+    PROP_BACK_MOTION = {
+        # 느긋하게 — 빠르면 캐릭터가 안절부절못하는 것처럼 보인다.
+        # 기뽀 요정 날개(back_period 1.0)보다 한참 느리게 잡았다. 그 값은
+        # 날개가 작아서 괜찮았지, 큰 날개·꼬리에 그대로 쓰면 부산스럽다.
+        "prop7": {"motion": "sway", "amp": 6.0, "period": 4.5,
+                  "jitter": 0.25, "pivot": [0.12, 0.25]},   # 악마 꼬리
+        "prop8": {"motion": "flap", "amp": 0.22, "period": 3.2,
+                  "jitter": 0.3},                            # 천사 날개
+    }
+
+    def _load_prop_back(self, pick, s, pil_cache):
+        """뽑힌 소품에 '몸 뒤에 그리는 짝'이 있으면 같이 읽는다.
+
+        악마 세트는 뿔(앞)+꼬리(뒤), 천사 세트는 고리(앞)+날개(뒤)처럼
+        한 소품이 몸 앞뒤로 나뉜다. PSD에서 몸체보다 아래에 둔 레이어가
+        '{소품}_back'으로 뽑혀 있다.
+        """
+        self.has["prop_back"] = False
+        name = f"{pick}_back"
+        path = os.path.join(self.prop_dir, f"{name}.png")
+        if name not in self._prop_layout or not os.path.exists(path):
+            return
+        im = Image.open(path).convert("RGBA")
+        if s != 1.0:
+            im = im.resize((max(1, round(im.width * s)),
+                            max(1, round(im.height * s))), Image.LANCZOS)
+        self.layout["prop_back"] = self._prop_layout[name]
+        pil_cache["prop_back"] = im
+        self.im["prop_back"] = ImageTk.PhotoImage(self._hard(im))
+        self.has["prop_back"] = True
+        # 기본 몸 뒤 파츠(기뽀 요정 날개)는 숨긴다 — 날개가 겹쳐 보이지 않게
+        self.has["back"] = False
+        cfg = dict(self.PROP_BACK_MOTION.get(pick) or {})
+        cfg.update((self.cfg.get("prop_back") or {}).get(pick) or {})
+        self._prop_back_cfg = cfg
+
     @staticmethod
     def _props_in(layout, folder):
-        """layout과 실제 PNG가 둘 다 있는 소품 이름들 (자동업데이트 섞임 대비)."""
+        """layout과 실제 PNG가 둘 다 있는 소품 이름들 (자동업데이트 섞임 대비).
+
+        '..._back'은 몸 뒤에 그리는 짝(악마 꼬리·천사 날개)이라 따로 뽑지
+        않는다. 앞쪽 소품이 뽑히면 그 짝으로 같이 따라 나온다.
+        """
         return sorted(n for n in layout
                       if n.startswith("prop") and n != "prop"
+                      and not n.endswith("_back")
                       and os.path.exists(os.path.join(folder, f"{n}.png")))
 
     def _pick_prop(self):
@@ -2867,11 +2916,18 @@ class Mascot:
                                                  else self._hard(im))
             self.has["prop"] = True
             self.prop_name = pick
-            if "prop" not in (self.layout.get("overlays") or []):
-                # 슬롯 layout이 소품을 모르면(옷만 바꾼 슬롯) 머리카락 앞에 끼운다
-                ov = list(self.layout.get("overlays") or [])
-                ov.insert(ov.index("hair") if "hair" in ov else len(ov), "prop")
-                self.layout["overlays"] = ov
+            # 소품마다 그리는 층이 다르다 — 안경은 앞머리 아래, 머리띠는
+            # 앞머리 위. PSD에서 뽑아 둔 'over'(덮개 몇 장 뒤인가)대로 끼운다.
+            ov = [o for o in (self.layout.get("overlays") or []) if o != "prop"]
+            over = self._prop_layout[pick].get("over")
+            if over is None:
+                # 옛 layout이라 정보가 없다 — 예전처럼 머리카락 앞에 둔다
+                pos = ov.index("hair") if "hair" in ov else len(ov)
+            else:
+                pos = max(0, min(int(over), len(ov)))
+            ov.insert(pos, "prop")
+            self.layout["overlays"] = ov
+            self._load_prop_back(pick, s, pil_cache)
 
         # 타이머 카드 가로 중심 = 책상 내용의 중심 (캔버스 중심이 아니라)
         self.card_cx = self.W / 2
@@ -3250,7 +3306,7 @@ class Mascot:
         tx, ty = self.cfg.get("pen_tip", self.layout["arm_pen"]["pen_tip"])
         self.pen_base_tip = ((px + tx) * s + self.ox, (py + ty) * s + self.oy)
         self.quad = [(x * s + self.ox, y * s + self.oy)
-                     for x, y in self.cfg["screen_quad"]]
+                     for x, y in self._quad_src]
         blink = self.cfg.get("blink")
         self.blink_cfg = None
         if blink and self.has["body_mask"]:
@@ -3357,63 +3413,100 @@ class Mascot:
         return Image.BICUBIC
 
     def _draw_back(self, now, yo):
-        """몸 뒤 파츠 — config의 back_motion에 따라 살짝 움직인다.
+        """기본 몸 뒤 파츠 (사가 양갈래·기뽀 요정 날개)."""
+        self._back_anim("back", {
+            "motion": self.cfg.get("back_motion"),
+            "amp": self.cfg.get("back_amp", 1.0),
+            "period": self.cfg.get("back_period", 2.6),
+            "jitter": self.cfg.get("back_jitter", 0.0),
+            "pivot": self.cfg.get("back_pivot"),
+        }, now, yo)
 
-          sway : 머리 붙는 자리를 축으로 좌우로 천천히 흔들림 (양갈래 머리)
+    def _draw_prop_back(self, now, yo):
+        """뽑힌 소품의 몸 뒤 조각 (악마 꼬리·천사 날개)."""
+        self._back_anim("prop_back", self._prop_back_cfg, now, yo)
+
+    def _back_anim(self, name, mo, now, yo):
+        """몸 뒤 파츠 — 설정대로 살짝 움직인다.
+
+          sway : 붙는 자리를 축으로 좌우로 천천히 흔들림 (양갈래·꼬리)
           flap : 가로로 오므렸다 폈다 (날갯짓)
           없음 : 그냥 붙어만 있음
 
         프레임마다 이미지를 새로 만들면 메모리가 계속 늘어나므로(옛 팔 사고),
         움직임을 정해진 칸으로 끊어 캐시한다. 칸 수만큼만 이미지가 생긴다.
+        기본 날개와 소품 날개가 함께 있을 수 있으므로 박자는 이름별로 든다.
         """
-        x, y = self._pos("back")
-        mode = self.cfg.get("back_motion")
+        x, y = self._pos(name)
+        mode = mo.get("motion")
         if not mode:
-            self._put("back", x, y + yo)
+            self._put(name, x, y + yo)
             return
-        amp = float(self.cfg.get("back_amp", 1.0))
+        amp = float(mo.get("amp", 1.0))
         STEPS = 12                       # 한 주기를 12칸으로 — 캐시가 12장이면 끝
+        st = self._back_st.get(name)
+        if st is None:
+            st = self._back_st[name] = {
+                "phase": 0.0, "last": 0.0,
+                "period": float(mo.get("period", 2.6))}
         # 위상을 직접 굴린다 — 한 번 왕복할 때마다 다음 주기를 새로 뽑을 수 있게
         # (시계에서 바로 계산하면 속도를 바꿀 수 없어 날갯짓이 기계적으로 보인다)
-        dt = 0.0 if self._back_last <= 0 else min(now - self._back_last, 0.2)
-        self._back_last = now
-        self._back_phase += dt / max(self._back_period, 0.15)
-        if self._back_phase >= 1.0:
-            self._back_phase -= int(self._back_phase)
-            self._back_period = self._new_back_period()
-        k = int(self._back_phase * STEPS) % STEPS
-        img = self._back_frame(mode, k, STEPS, amp)
-        if img is None:
-            self._put("back", x, y + yo)
+        dt = 0.0 if st["last"] <= 0 else min(now - st["last"], 0.2)
+        st["last"] = now
+        st["phase"] += dt / max(st["period"], 0.15)
+        if st["phase"] >= 1.0:
+            st["phase"] -= int(st["phase"])
+            st["period"] = self._new_back_period(mo)
+        k = int(st["phase"] * STEPS) % STEPS
+        got = self._back_frame(name, mode, k, STEPS, amp, mo)
+        if got is None:
+            self._put(name, x, y + yo)
             return
-        # 회전·확대로 캔버스가 커졌을 수 있으니 중심을 맞춰 그린다
-        bw, bh = self._pil_cache["back"].size
-        self.canvas.create_image(x + bw / 2, y + bh / 2 + yo,
-                                 image=img, anchor="center")
+        # 여백(pad)만큼 키운 판에 그려 두었으니 그만큼 되돌려 붙인다.
+        # 이렇게 해야 회전축이 픽셀 그대로 고정된다 — 꼬리 연결부가 몸 뒤에
+        # 숨어 있으려면 축이 미끄러지면 안 된다.
+        img, pad = got
+        self.canvas.create_image(x - pad, y - pad + yo, image=img, anchor="nw")
 
-    def _new_back_period(self):
-        """다음 한 번의 왕복에 걸릴 시간. back_jitter가 있으면 매번 흔들어
+    @staticmethod
+    def _new_back_period(mo):
+        """다음 한 번의 왕복에 걸릴 시간. jitter가 있으면 매번 흔들어
         뽑는다 — 새가 파닥이듯 빨라졌다 느려졌다 하게."""
-        base = float(self.cfg.get("back_period", 2.6))
-        j = float(self.cfg.get("back_jitter", 0.0))
+        base = float(mo.get("period", 2.6))
+        j = float(mo.get("jitter", 0.0) or 0.0)
         if j <= 0:
             return base
         return base * random.uniform(max(0.15, 1.0 - j), 1.0 + j)
 
-    def _back_frame(self, mode, k, steps, amp):
-        key = (mode, k)
+    def _back_frame(self, name, mode, k, steps, amp, mo):
+        key = (name, mode, k)
         hit = self._back_cache.get(key)
         if hit is not None:
             return hit
-        pil = self._pil_cache.get("back")
+        pil = self._pil_cache.get(name)
         if pil is None:
             return None
         t = math.sin(2 * math.pi * k / steps)
+        pad = 0
         if mode == "sway":
-            # 머리에 붙는 위쪽 중앙을 축으로 — 아래(머리끝)로 갈수록 크게 흔들린다
-            pivot = (pil.width / 2, pil.height * 0.12)
-            im = pil.rotate(t * amp, center=pivot, resample=self._resample(),
-                            expand=True)
+            # 붙는 자리를 축으로 — 멀어질수록 크게 흔들린다. 꼬리처럼 축이
+            # 한쪽에 치우친 파츠는 pivot으로 옮긴다 (그림 크기 대비 비율).
+            px, py = (mo.get("pivot") or (0.5, 0.12))[:2]
+            cx, cy = pil.width * float(px), pil.height * float(py)
+            # expand=True로 돌리면 판이 커지면서 축이 어디로 갔는지 알기
+            # 어려워, 그리는 쪽에서 중심을 어림잡게 된다. 그러면 꼬리
+            # 연결부가 몸 밖으로 밀려 나온다. 대신 미리 여백을 둔 판에
+            # expand 없이 돌려서 축을 픽셀 그대로 붙잡는다.
+            far = max(math.hypot(dx, dy) for dx, dy in
+                      ((0 - cx, 0 - cy), (pil.width - cx, 0 - cy),
+                       (0 - cx, pil.height - cy),
+                       (pil.width - cx, pil.height - cy)))
+            pad = int(math.ceil(far * 2 * math.sin(math.radians(abs(amp)) / 2))) + 2
+            base = Image.new("RGBA", (pil.width + 2 * pad, pil.height + 2 * pad),
+                             (0, 0, 0, 0))
+            base.alpha_composite(pil, (pad, pad))
+            im = base.rotate(t * amp, center=(cx + pad, cy + pad),
+                             resample=self._resample(), expand=False)
         elif mode == "flap":
             # 가로만 줄였다 늘렸다 — 좌우 날개가 함께 접혔다 펴지는 느낌
             f = 1.0 - (1.0 - math.cos(2 * math.pi * k / steps)) * 0.5 * amp
@@ -3425,9 +3518,9 @@ class Mascot:
             return None
         if len(self._back_cache) > 40:
             self._back_cache.clear()
-        img = ImageTk.PhotoImage(self._hard(im))
-        self._back_cache[key] = img
-        return img
+        hit = (ImageTk.PhotoImage(self._hard(im)), pad)
+        self._back_cache[key] = hit
+        return hit
 
     def _rotated_hop(self, name, deg):
         """손 파츠를 어깨 앵커 기준으로 회전한 이미지 (1도 단위 캐시)."""
@@ -6636,8 +6729,11 @@ class Mascot:
         # ── 몸 (+머리 없는 캐릭터는 여기서 얼굴까지) ─────────────────────
         # 개는 머리를 팔 위에 그려야 어깨가 안 튀어나오므로, 얼굴을 팔 뒤로 미룬다.
         head_early = bool(self.cfg.get("arms_over_head") and self.has.get("head"))
-        # 몸 뒤 파츠(사가 양갈래·기뽀 날개) — 몸보다 먼저, 살아 있게 움직인다
-        if self.has.get("back"):
+        # 몸 뒤 파츠(사가 양갈래·기뽀 날개) — 몸보다 먼저, 살아 있게 움직인다.
+        # 소품의 뒤쪽 조각(악마 꼬리·천사 날개)이 있으면 그것이 자리를 대신한다.
+        if self.has.get("prop_back"):
+            self._safe("prop_back", self._draw_prop_back, now, yo)
+        elif self.has.get("back"):
             self._safe("back", self._draw_back, now, yo)
         bx, by = self._pos("body_open")
         self._safe("body", self._put, "body_open", bx, by + yo)

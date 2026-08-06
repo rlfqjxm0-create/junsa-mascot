@@ -3,20 +3,20 @@
  "scale": 0.34,
  "screen_quad": [
   [
-   240,
-   1066
+   254,
+   1147
   ],
   [
-   490,
-   1060
+   492,
+   1147
   ],
   [
-   460,
-   1112
+   483,
+   1233
   ],
   [
-   215,
-   1090
+   210,
+   1234
   ]
  ],
  "blink": null,
@@ -42,7 +42,7 @@
  ],
  "nose": [
   508,
-  788
+  899
  ],
  "pet_scale": 1.3,
  "pet_rot": -10,
@@ -57,7 +57,25 @@
   },
   {
    "name": "메이드복",
-   "dir": "skins/maid"
+   "dir": "skins/maid",
+   "screen_quad": [
+    [
+     248,
+     1127
+    ],
+    [
+     486,
+     1127
+    ],
+    [
+     477,
+     1213
+    ],
+    [
+     204,
+     1214
+    ]
+   ]
   }
  ],
  "pen_grain": true,
@@ -123,5 +141,11 @@
  "soft_overlay": true,
  "pen_monitor_pick": false,
  "feedback_url_enc": "DRoVXR5bXEwLHV4FChcATAIMBkoPEURCFhYBBxtCDRZKVVdSUV5VWFUaWFJDU11CHF9dVEsaFzNGUCYGeT4LPjwoOn8KNlMmOlAHWSwXIHobJjcgMABrCyAPVyAmKBoCBxhHCykrUFokfCICCTMyMywcVAQDYAsNBw==",
- "gestures_plus": true
+ "gestures_plus": true,
+ "part_offsets": {
+  "prop7_back": [
+   -55,
+   0
+  ]
+ }
 }
