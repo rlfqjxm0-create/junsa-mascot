@@ -1542,17 +1542,20 @@ def update_notice(char_dir, state_dir):
     갱신되므로, 친구에게 exe를 다시 보내지 않아도 이 경로는 동작한다.
     """
     msg, notes = _take_update_flag(state_dir)
-    ver, vnotes = None, []
+    ver, vnotes, silent = None, [], False
     try:
         p = os.path.join(os.path.dirname(char_dir), "version.json")
         with open(p, encoding="utf-8") as fp:
             man = json.load(fp)
         ver = man.get("version")
         vnotes = [str(s) for s in (man.get("notes") or []) if str(s).strip()]
+        # 조용한 배포 — 알릴 만한 변화가 아니라 팝업을 띄우지 않는다.
+        # 런처(exe)는 자동 갱신이 안 돼서 늘 신호를 남기므로, 여기서 막는다.
+        silent = bool(man.get("silent"))
     except Exception:
         pass
     if ver is None:
-        return msg, notes
+        return (None, []) if silent else (msg, notes)
     seen_path = os.path.join(state_dir, SEEN_FILE)
     seen = None
     try:
@@ -1566,11 +1569,12 @@ def update_notice(char_dir, state_dir):
                 json.dump({"version": ver}, fp)
         except Exception:
             pass
-        if seen is not None:          # 설치 후 첫 실행은 알릴 '변경'이 없다
+        if seen is not None and not silent:   # 설치 후 첫 실행은 알릴 '변경'이 없다
             msg = msg or "새 버전으로 업데이트 됐어요!"
             notes = notes or vnotes
-        _update_log_add(state_dir, ver, vnotes or notes)
-    return msg, notes
+        if not silent:
+            _update_log_add(state_dir, ver, vnotes or notes)
+    return (None, []) if silent else (msg, notes)
 
 
 UPDATE_LOG = ".update_log.json"   # 지난 업데이트 안내 보관 (최근 20개)
@@ -1711,7 +1715,7 @@ class TodoPanel:
 
     def __init__(self, master, card, bg, on_done, on_move, on_edit=None,
                  offset=None, flip=False, on_flip=None, ui_k=1.0,
-                 zoom=100, on_zoom=None):
+                 zoom=100, on_zoom=None, on_delete=None):
         # 화면 배율 반영 — 비율은 그대로 두고 통째로 키운다. 배율이 큰 화면에서
         # 폭·글자를 안 키우면 물리적으로 너무 작게 보인다. 다만 얼마나 커야
         # 편한지는 사람마다 달라서, 우클릭 메뉴에서 다시 조절할 수 있게 했다.
@@ -1723,6 +1727,7 @@ class TodoPanel:
         self.on_done = on_done
         self.on_move = on_move
         self.on_edit = on_edit
+        self.on_delete = on_delete   # 완료로 치지 않고 그냥 지우기
         self.on_flip = on_flip
         # 꼬리 방향 — 패널을 캐릭터 오른쪽에 두면 꼬리도 왼쪽을 봐야 한다
         self.flip = bool(flip)
@@ -1905,7 +1910,7 @@ class TodoPanel:
         return None
 
     def _menu(self, e):
-        """말풍선 우클릭 — 수정 / 완료 / 꼬리 방향."""
+        """말풍선 우클릭 — 수정 / 완료 / 삭제 / 꼬리 방향."""
         idx = self._at(e.x, e.y)
         if idx is None:
             return
@@ -1914,6 +1919,9 @@ class TodoPanel:
         if self.on_edit is not None:
             m.add_command(label="수정", command=lambda: self.on_edit(idx))
         m.add_command(label="완료", command=lambda: self.on_done(idx))
+        if self.on_delete is not None:
+            # 완료와 다르다 — 축하도 기록도 없이 목록에서만 뺀다
+            m.add_command(label="삭제", command=lambda: self.on_delete(idx))
         m.add_separator()
         m.add_command(label="꼬리 오른쪽으로" if self.flip else "꼬리 왼쪽으로",
                       command=self._toggle_flip)
@@ -2400,7 +2408,8 @@ class Mascot:
                                         self._todo_edit, self.todo_pos,
                                         self.todo_flip, self._todo_flipped,
                                         self.ui_k, self.todo_zoom,
-                                        self._todo_zoomed)
+                                        self._todo_zoomed,
+                                        on_delete=self._todo_delete)
             self.root.after(250, self._todo_refresh)   # 창 위치가 잡힌 뒤 배치
 
         # ── 마감 목록 (config의 "deadline_on") ───────────────────────────
@@ -2562,7 +2571,15 @@ class Mascot:
         menu.add_separator()
         menu.add_command(label="종료", command=self.close)
         self._menu = menu            # 트레이 아이콘에서도 같은 메뉴를 쓴다
-        self.canvas.bind("<Button-3>", lambda e: menu.tk_popup(e.x_root, e.y_root))
+        # grab_release를 안 하면 메뉴를 닫은 뒤에도 마우스를 붙잡고 있어
+        # 다음 클릭이 엉뚱하게 먹힌다
+        def _pop(e):
+            try:
+                menu.tk_popup(e.x_root, e.y_root)
+            finally:
+                menu.grab_release()
+
+        self.canvas.bind("<Button-3>", _pop)
         self.tray = None
         self._tray_q = []            # 트레이 스레드가 넣고 그리기 루프가 뺀다
         self._safe("tray", self._tray_setup)
@@ -3846,6 +3863,18 @@ class Mascot:
         for _ in range(2):                  # 잘했다는 하트
             self._safe("fx", self._spawn_note, now, "heart")
 
+    def _todo_delete(self, idx):
+        """우클릭 > 삭제 — 목록에서만 뺀다.
+
+        '완료'와 다르다. 축하도 없고 끝낸 일로 기록에도 올리지 않는다
+        (잘못 적었거나 안 하기로 한 일을 지우는 용도).
+        """
+        if not (0 <= idx < len(self.todos)):
+            return
+        del self.todos[idx]
+        self._todo_save()
+        self._todo_refresh()
+
     def _todo_edit(self, idx):
         """우클릭 > 수정 — 그 할 일의 글을 고친다."""
         if 0 <= idx < len(self.todos):
@@ -4482,10 +4511,37 @@ class Mascot:
         while self._tray_q:
             what = self._tray_q.pop(0)
             if what == "menu":
-                x, y = cursor_pos()
-                self._menu.tk_popup(int(x), int(y))
+                self._tray_menu()
             else:
                 self._tray_call()
+
+    def _tray_menu(self):
+        """트레이 우클릭 메뉴 — 바깥을 누르면 그냥 닫히게.
+
+        메뉴를 띄울 때 우리 창이 맨 앞(포그라운드)이 아니면, 윈도우가 바깥
+        클릭을 메뉴에 전달하지 않아 메뉴가 계속 떠 있는다. 트레이 아이콘을
+        누른 시점의 맨 앞 창은 사용자가 쓰던 프로그램이라 늘 이 상태가 된다.
+        메뉴를 띄우기 직전에 창을 맨 앞으로 올려 두면 정상적으로 닫힌다.
+        (트레이 프로그램이 쓰는 정석 방법 — 메뉴가 닫힌 뒤 빈 메시지를 보내
+        윈도우가 메뉴 상태를 정리하게 한다.)
+        """
+        x, y = cursor_pos()
+        hwnd = getattr(self, "_main_hwnd", 0)
+        u = ctypes.windll.user32 if IS_WIN else None
+        if u is not None and hwnd:
+            try:
+                u.SetForegroundWindow(hwnd)
+            except Exception:
+                pass
+        try:
+            self._menu.tk_popup(int(x), int(y))
+        finally:
+            self._menu.grab_release()
+            if u is not None and hwnd:
+                try:
+                    u.PostMessageW(hwnd, 0x0000, 0, 0)   # WM_NULL
+                except Exception:
+                    pass
 
     def _tray_call(self):
         """캐릭터를 불러온다 — 화면 밖이면 보이는 자리로 끌어온다."""

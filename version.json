@@ -1,7 +1,7 @@
 {
- "version": 1786043039,
+ "version": 1786135510,
  "files": {
-  "mascot.py": "a8e33e4ca88f05919f3371ba021808b160a151de25ba9939e217a01806e86982",
+  "mascot.py": "a740c832e87123b7617babe44068c641bb49c1cb4512378476b151fd2c7cddb0",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -198,7 +198,6 @@
   "parts_junsa/sounds/tealios-v2_Akira/space.wav": "b47b8e94ff0882a8793322ea6275d6447d9bc7f8de2a88791c9631d1164426ba",
   "parts_junsa/sounds/tealios-v2_Akira/tab.wav": "0718e9c5b1311b80d3337617d28667297eee897fa56d3d5a1174b94071fbcbf6"
  },
- "notes": [
-  "새로운 소품 파츠가 추가됐어요. 켤 때마다 랜덤으로 하나씩 나옵니다."
- ]
+ "notes": [],
+ "silent": true
 }
