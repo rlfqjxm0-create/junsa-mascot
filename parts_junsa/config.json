@@ -147,5 +147,18 @@
    -55,
    0
   ]
+ },
+ "stickers": true,
+ "youtube": true,
+ "card": {
+  "bg": "#ffffff",
+  "border": "#4a4a52",
+  "text": "#2e2e34",
+  "sub": "#8b8b93",
+  "track": "#ececef",
+  "fill": "#4a4a52",
+  "panel": "#fbfbfc",
+  "soft": "#f4f4f6",
+  "line": "#e4e4e8"
  }
 }
