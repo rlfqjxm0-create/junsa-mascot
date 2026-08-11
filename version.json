@@ -1,7 +1,7 @@
 {
- "version": 1786455002,
+ "version": 1786456381,
  "files": {
-  "mascot.py": "ca4f2d5efb3387b420894e1c5a7e3363a02173cd966e88fae4f53d35959a4687",
+  "mascot.py": "6e88022b069b5d68d6db65702878f811f27f7cea753f6b5e4130b600fd54e79e",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -205,7 +205,6 @@
   "stickers/__init__.py": "d77e3dc92cb353dced8d192c140643c6458bc3901facdf2e0a0d0830fa4244b7",
   "youtube_player.py": "33dd7fc8cf781b8b8a37c1a60a54b7506ebce5b44399d28fc0841d143d19e70c"
  },
- "notes": [
-  "지난 업데이트 소식을 언제든 다시 볼 수 있어요\n캐릭터를 오른쪽 버튼으로 눌러 '업데이트 소식'을 열면, 지금까지 있었던 변경 안내를 처음부터 다 보실 수 있습니다. 창 위쪽 좌우의 동그란 화살표로 넘겨 보세요. 늦게 설치하셨거나 그동안 안내를 못 보셨어도 전부 나옵니다."
- ]
+ "notes": [],
+ "silent": true
 }
