@@ -1,7 +1,7 @@
 {
- "version": 1786587932,
+ "version": 1786599661,
  "files": {
-  "mascot.py": "41f39fdeec0009a8bf88390539499cdd15b2f147ac275930024bbc7a4f3d6484",
+  "mascot.py": "2ae523ed0d7b1807201142019d7457fdbc4825857128a73fcfea497e113017ef",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -235,10 +235,6 @@
   "stickers/__init__.py": "d77e3dc92cb353dced8d192c140643c6458bc3901facdf2e0a0d0830fa4244b7",
   "youtube_player.py": "33dd7fc8cf781b8b8a37c1a60a54b7506ebce5b44399d28fc0841d143d19e70c"
  },
- "notes": [
-  "책상에 슬라임이 생겼어요\n책상을 누르면 키보드와 타블렛 위로 흰 매트가 깔리고 슬라임이 올라옵니다. 다시 누르면 치워져요.",
-  "두 손으로 만져요\n누르면 쑥 들어가고, 끌면 늘어났다가 놓으면 돌아옵니다. 만질 때마다 소리가 나요.",
-  "종류를 고를 수 있어요\n우클릭 → 슬라임에서 버터바와 치즈 중에 고릅니다. 색과 소리, 촉감이 다릅니다.",
-  "작업 중에도 만질 수 있어요\n그림 그리는 중에 눌러도 나옵니다. 한동안 안 만지면 저절로 치워져요."
- ]
+ "notes": [],
+ "silent": true
 }
