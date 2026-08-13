@@ -1,5 +1,5 @@
 {
- "version": 1786600776,
+ "version": 1786601238,
  "files": {
   "mascot.py": "6c87ca4bcdc349e9f9890a2308662f450da944a17b6fc4af44783fd52633d4c5",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
@@ -257,8 +257,6 @@
   "stickers/__init__.py": "d77e3dc92cb353dced8d192c140643c6458bc3901facdf2e0a0d0830fa4244b7",
   "youtube_player.py": "33dd7fc8cf781b8b8a37c1a60a54b7506ebce5b44399d28fc0841d143d19e70c"
  },
- "notes": [
-  "슬라임 소리가 다양해졌어요\n누를 때·늘릴 때·놓을 때 소리가 종류마다 스무 장 넘게 있어서 만질 때마다 다르게 들립니다.",
-  "놓을 때 나던 '따닥' 소리를 바꿨어요\n손가락 튕기는 것처럼 들리던 소리를 부드러운 것으로 갈았습니다."
- ]
+ "notes": [],
+ "silent": true
 }
