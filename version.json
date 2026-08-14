@@ -1,7 +1,7 @@
 {
- "version": 1786714356,
+ "version": 1786715469,
  "files": {
-  "mascot.py": "2600bcf700e0888be9453738bb9199e02513e1a0484cb14cf389068816b0c216",
+  "mascot.py": "7d0b03e8d4532acacea6a3677d4dabcb2c4fde0a7a65e972b5431b7b05145b9a",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -289,10 +289,6 @@
   "stickers/__init__.py": "d77e3dc92cb353dced8d192c140643c6458bc3901facdf2e0a0d0830fa4244b7",
   "youtube_player.py": "33dd7fc8cf781b8b8a37c1a60a54b7506ebce5b44399d28fc0841d143d19e70c"
  },
- "notes": [
-  "'홈'이 생겼어요\n캐릭터를 오른쪽 클릭하고 '홈'을 누르면, 같은 타이머를 쓰는 친구들이 나란히 앉아 같이 작업하는 방이 열립니다.",
-  "누가 켜져 있는지 한눈에 보여요\n칸마다 레벨·오늘 작업 시간·자고 있는지가 보입니다. 아직 안 켠 사람도 자리는 그대로 있어요.",
-  "콕·응원·담요·간식을 보낼 수 있어요\n캐릭터를 고르고 아래 단추를 누르면, 그 사람 타이머 화면에서 이펙트가 터지고 소리가 납니다.",
-  "보내는 것은 별명·레벨·작업 시간뿐이에요\n어떤 프로그램을 쓰는지, 창 제목은 보내지 않습니다. 환경설정에서 방을 끄거나 내 캐릭터만 숨길 수도 있어요."
- ]
+ "notes": [],
+ "silent": true
 }
