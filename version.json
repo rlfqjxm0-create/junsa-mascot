@@ -1,7 +1,7 @@
 {
- "version": 1786617234,
+ "version": 1786694373,
  "files": {
-  "mascot.py": "6d36c4edb716e86f7afa9d300668e0e0184649199a7581ceffa7ba6c82eb6ccf",
+  "mascot.py": "c490f35c5dc874ece4d6be21451f79098da8ac1c009ee9e823484e4d01b0c5e6",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -29,6 +29,8 @@
   "parts_junsa/prop8_back.png": "5f83dfc42fba4e7e4ab37a1d53b856463a0e55ddac5a0c25e6f31ed4ecbfe8db",
   "parts_junsa/prop9.png": "f3708e680e77d73e8dc34c27aaee073fbcd13360925a9ed6747a615b8bacd599",
   "parts_junsa/pupils.png": "942f010b921cfe0c4f4e8b22a7d8685c8139ee78c29f07ec835ee07cc04aaec9",
+  "parts_junsa/seat.png": "1c92ef29617577beefc9b98154efde1ea8ec32142a7eb934c32ca7061ca1d3c1",
+  "parts_junsa/seat_idle.png": "53b72772401008fc24f9dbf6eeffe7450ee6cc759467e6ac1ef4493903fc3180",
   "parts_junsa/smile.png": "32a7d28a8880324facfa0ffd981fada92264a3992624024f2ab15e40f7f2493f",
   "parts_junsa/skins/maid/arm_key.png": "97ce3a57a1def7b1c22157bac71b7beae76cfe9d72a2fff455725bb06b0e24bd",
   "parts_junsa/skins/maid/arm_pen.png": "472aa90755a4bdb27096ec5e9edfb12fec384b64e42ddaf2552ff5953ab6c352",
