@@ -12322,10 +12322,22 @@ class Mascot:
     def _room_event(self, ev):
         """남이 보낸 신호 — 내 캐릭터가 반응한다."""
         who = ""
-        for p in self.room_people:
-            if p.get("slot") == ev.get("f"):
-                who = str(p.get("n") or "")
-                break
+        mine = (ev.get("f") == self.char)     # 내가 나에게 (혼자 눌러 본 것)
+        if mine:
+            k = ev.get("k")
+            self.smile_until = max(self.smile_until, time.time() + 2.5)
+            self._say({"poke": "콕!", "cheer": "혼자 응원해 봤어요",
+                       "blanket": "담요를 덮었어요",
+                       "snack": "간식을 먹었어요"}.get(k, "…"), 3.0)
+            self._room_flash[self.char] = time.time()
+            return
+        if False:
+            pass
+        else:
+            for p in self.room_people:
+                if p.get("slot") == ev.get("f"):
+                    who = str(p.get("n") or "")
+                    break
         kind = ev.get("k")
         now = time.time()
         if kind == "poke":
@@ -12448,12 +12460,14 @@ class Mascot:
                            Image.LANCZOS)
             line = self._room_deskline(slot)
             if line and 0.2 < line < 0.95:
+                # 몸은 통짜로 두고, 책상 조각을 그 위에 고정으로 덮는다.
+                # 몸을 잘라 올리면 잘린 자리가 그대로 드러난다 (실제로 겪음).
                 cut = int(h * line)
-                pair = (ImageTk.PhotoImage(im.crop((0, 0, im.width, cut))),
+                pair = (ImageTk.PhotoImage(im),
                         ImageTk.PhotoImage(im.crop((0, cut, im.width, h))),
-                        cut)
+                        h - cut)
             else:
-                pair = (ImageTk.PhotoImage(im), None, h)
+                pair = (ImageTk.PhotoImage(im), None, 0)
         except Exception:
             self._room_art_bad.add(slot)
             return None
@@ -12790,18 +12804,15 @@ class Mascot:
             cx = (kx0 + kx1) / 2
             base = floor + 4 * k
             pose = self._room_pose(p)
+            item = cv.create_image(cx, base + bob, image=body, anchor="s",
+                                   tags="dyn")
+            ditem = None
             if desk is not None:
+                # 책상을 나중에 그려 위에 덮는다 — 뒤에서 몸이 움직여도
+                # 책상은 붙박이고 이음매도 안 보인다.
                 ditem = cv.create_image(cx, base, image=desk, anchor="s",
                                         tags="dyn")
-                item = cv.create_image(cx, base - desk.height() + bob,
-                                       image=body, anchor="s", tags="dyn")
-                self._room_body.append((item, ditem, slot,
-                                        base - desk.height(), sleeping, pose))
-            else:
-                item = cv.create_image(cx, base + bob, image=body,
-                                       anchor="s", tags="dyn")
-                self._room_body.append((item, None, slot, base, sleeping,
-                                        pose))
+            self._room_body.append((item, ditem, slot, base, sleeping, pose))
         else:
             cv.create_oval((kx0 + kx1) / 2 - 26 * k, floor - 56 * k,
                            (kx0 + kx1) / 2 + 26 * k, floor - 4 * k,
@@ -12891,9 +12902,22 @@ class Mascot:
             x += bw + gap
 
     def _room_send(self, kind):
-        """단추를 눌렀을 때 — 고른 상대에게만 간다."""
+        """단추를 눌렀을 때 — 고른 상대에게만 간다.
+
+        나에게 보낸 것은 서버를 거쳐 돌아오지 않는다(자기 것은 걸러진다).
+        그래서 나를 고른 경우에는 그 자리에서 바로 반응한다.
+        """
         to = self._room_pick
-        if not to or self.room_net is None:
+        if not to:
+            return
+        if to == self.char:
+            self._room_flash[to] = time.time()
+            self._room_note = (dict((b, a) for a, b, _c in self.ROOM_BTN).get(
+                kind, kind), time.time())
+            self._safe("room_self", self._room_event,
+                       {"f": self.char, "k": kind})
+            return
+        if self.room_net is None:
             return
         self.room_net.send(to, kind)
         if to == "*":
@@ -13029,20 +13053,17 @@ class Mascot:
                 return
         for x0, y0, x1, y1, slot, sleeping in self._room_hit:
             if x0 <= e.x <= x1 and y0 <= e.y <= y1:
+                self._room_pick = None if self._room_pick == slot else slot
                 if slot == self.char:
-                    # 내 캐릭터를 누르면 방 전체에 손을 흔든다.
-                    # 나를 '보낼 상대'로 고르지는 않는다 — 내가 보낸 것은
-                    # 나에게 오지 않으므로 눌러도 아무 일이 없다.
+                    # 나를 눌러도 골라진다 (혼자서도 눌러 볼 수 있게).
+                    # 겸사겸사 방 전체에 손을 흔든다.
                     if self.room_net is not None:
                         self.room_net.send("*", "wave")
                     self._room_flash[slot] = time.time()
                     self._room_note = ("손 흔들기", time.time())
                     self.smile_until = max(self.smile_until, time.time() + 2.0)
                     self._safe("room_wave_snd", self._poke_sound)
-                    self._safe("room_draw", self._room_draw)
-                    return
-                self._room_pick = None if self._room_pick == slot else slot
-                if self.room_net is not None:
+                elif self.room_net is not None:
                     self.room_net.send(slot, "blanket" if sleeping else "poke")
                     self._room_flash[slot] = time.time()
                 self._safe("room_draw", self._room_draw)
