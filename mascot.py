@@ -3664,7 +3664,16 @@ class Mascot:
         if self.todo_on or self.cfg.get("deadline_on") or self._yt_on():
             menu.add_separator()
         if ROOM_URL and ROOM_KEY:
-            menu.add_command(label="홈", command=self._room_toggle)
+            # 작업 종료처럼 색을 깔아 눈에 띄게 둔다. 다만 한 단계 옅게 —
+            # 되돌릴 수 없는 '작업 종료'가 여전히 가장 세 보여야 한다.
+            _hb = self._tint(self.card["fill"], 0.62)
+            menu.add_command(label="  홈  ", command=self._room_toggle,
+                             font=self._uf(9, True),
+                             foreground=self._shade(self.card["fill"], 0.35),
+                             background=_hb,
+                             activeforeground="#ffffff",
+                             activebackground=self._shade(
+                                 self.card["fill"], 0.22))
         menu.add_command(label="환경설정", command=self.open_settings)
         if self.cfg.get("update_dot"):
             menu.add_command(label="업데이트 소식", command=self.open_update_news)
@@ -13111,22 +13120,24 @@ class Mascot:
         elif msg:
             # 오늘 한 줄 — 캐릭터 머리 위 빈자리에 말풍선으로.
             # 알림이 뜬 동안은 그쪽이 먼저다 (같은 자리라 겹친다).
-            f3 = self._uf(8)
+            # 캐릭터 머리 위 여백은 칸 위에서 44*k 까지다 (그 아래는 그림).
+            # 말풍선은 꼬리까지 그 안에 들어가야 머리를 안 가린다.
+            f3 = self._uf(10)
             line = msg
-            while line and self._room_tw(cv, line, f3) > (kx1 - kx0) - 44 * k:
+            while line and self._room_tw(cv, line, f3) > (kx1 - kx0) - 34 * k:
                 line = line[:-1]
             tw3 = self._room_tw(cv, line, f3)
-            ny = ky0 + 18 * k
+            ny = ky0 + 19 * k
             edge = self._tint(col, 0.35)
-            self._rr(cv, cx2 - tw3 / 2 - 11 * k, ny - 12 * k,
-                     cx2 + tw3 / 2 + 11 * k, ny + 12 * k, 11 * k,
+            self._rr(cv, cx2 - tw3 / 2 - 14 * k, ny - 15 * k,
+                     cx2 + tw3 / 2 + 14 * k, ny + 15 * k, 14 * k,
                      fill="#ffffff", outline=edge, width=2)
             # 꼬리 — 그린 뒤에 말풍선 아랫선을 흰 줄로 덮어야 이어져 보인다
-            cv.create_polygon(cx2 - 5 * k, ny + 11 * k, cx2 + 5 * k,
-                              ny + 11 * k, cx2 - 1 * k, ny + 19 * k,
+            cv.create_polygon(cx2 - 7 * k, ny + 14 * k, cx2 + 7 * k,
+                              ny + 14 * k, cx2 - 2 * k, ny + 24 * k,
                               fill="#ffffff", outline=edge, width=2,
                               tags="dyn")
-            cv.create_line(cx2 - 4 * k, ny + 12 * k, cx2 + 4 * k, ny + 12 * k,
+            cv.create_line(cx2 - 6 * k, ny + 15 * k, cx2 + 6 * k, ny + 15 * k,
                            fill="#ffffff", width=max(2, int(3 * k)),
                            tags="dyn")
             cv.create_text(cx2, ny, text=line, font=f3,
