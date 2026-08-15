@@ -1,7 +1,7 @@
 {
- "version": 1786761916,
+ "version": 1786834052,
  "files": {
-  "mascot.py": "b5921d786a3f482de26df4bbc979f0a0b14a8c6f7dbcd370e67ac5363553818b",
+  "mascot.py": "5e3e1c67fcf55493e9c6e480391fd0e50d42c25776a8264f8a82180e0ea440a7",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -14,10 +14,15 @@
   "parts_junsa/hat.png": "4bd1da80b760cff3694c7b21350e8dce6a177026846dcd737d796ad7560f277f",
   "parts_junsa/head.png": "12b8d27857a0cf5354776fd7dd8c23ae2d9cd245eb35eddb9fc0919a2cd869bc",
   "parts_junsa/lashes.png": "aea2649410308f66078d48f3d3580a523ba1cea34252c75aee8e9ef65d6d7ab8",
-  "parts_junsa/layout.json": "e6cfacef0e2a805bf986fbdaaf1140ab784d7bf511b03abd67667e56f988a329",
+  "parts_junsa/layout.json": "31219f84b8b638d4aecbb8763d46dd10b218d8b1eabac1f74c9d3f3da39b97b1",
   "parts_junsa/pet1.png": "ccf3ec92d18fe787212a98d1a1bbc0b70383d565332d5f95dbe5de4cf14e13b2",
   "parts_junsa/pet2.png": "664cde3775e26d09b22534a5e995bf9c1e7e4e1040396553ec3ef7c9ec1fd243",
   "parts_junsa/prop1.png": "c6c932bcbd39f1a7052d9741c8b040135ff46af612bd21a17e9ce29e798c88db",
+  "parts_junsa/prop10_back.png": "9c151b667a305e0b40917014640ebb0b599d65f77fbb44f467f973eb245a4198",
+  "parts_junsa/prop11.png": "5018d089066acf04ff2118046d99d1112eacb9819345988f562674b49035022f",
+  "parts_junsa/prop12.png": "8695e3a96e06a2f1ccd88c656e3b89849b01d63ee78fd97f7ca1f855ad55e541",
+  "parts_junsa/prop13.png": "a0fdd1fdebbe4a9de0c7d34276c53ce9c9ed9d044b85eac7464d7e75aa71cbcf",
+  "parts_junsa/prop14.png": "f287103ec83d2880ec7352fb85842da7b68c7b9c72c68858cd6b44c94268323f",
   "parts_junsa/prop2.png": "9bc9d054486d8bae5265b8e32578f2775e46a282454d2507d7928bca65e2f139",
   "parts_junsa/prop3.png": "c747b74d6f50d0a99ff15c96512b0fc53865a8796d88df9686442df5a1df7f97",
   "parts_junsa/prop4.png": "32c2dc907ceff321fc76755798a8cf69bda1d1f5c5c54ffd5e697309542e38fe",
@@ -29,12 +34,12 @@
   "parts_junsa/prop8_back.png": "5f83dfc42fba4e7e4ab37a1d53b856463a0e55ddac5a0c25e6f31ed4ecbfe8db",
   "parts_junsa/prop9.png": "f3708e680e77d73e8dc34c27aaee073fbcd13360925a9ed6747a615b8bacd599",
   "parts_junsa/pupils.png": "942f010b921cfe0c4f4e8b22a7d8685c8139ee78c29f07ec835ee07cc04aaec9",
-  "parts_junsa/seat.png": "79d13abfa3ea5d0884624bfb1cb2f33f14f47ad4f0aa51db45ea45ff73a6f468",
-  "parts_junsa/seat_idle.png": "2b91c1e4fcb03699de6f5a733b3be759c1e84ecd97d466f3d5f98fd46a136a65",
-  "parts_junsa/seat_meta.json": "2347e89e6e4d4521af3644436f4ca97380da571e828d5ce4853dbd187a38d0ef",
-  "parts_junsa/seat_pen.png": "ec51f907163b257aa4d19e4b7d7e75e21c80eacb9d3a073619e80e4daabc9d3c",
-  "parts_junsa/seat_pen2.png": "944e837be5849f544456cdd431abf8f9a544adbbb976110a94fa436e705f0256",
-  "parts_junsa/seat_type.png": "8b76009635e14203ea19d38d0525886d23e42fff7da08b20f2ae14929cad455c",
+  "parts_junsa/seat.png": "efa9944067c4540ce2f9614cbba58b87824aabb948daaa4faab857263ca9397e",
+  "parts_junsa/seat_idle.png": "a584aeafe7de934f4c154315d34f95d064971467cd0ebda31414ddf4a30088c1",
+  "parts_junsa/seat_meta.json": "d1495d0028aa124428ad0c9601cdcc955f26ada104df4964144c0e8e53ee4a4b",
+  "parts_junsa/seat_pen.png": "01c7ee73fd5b89a0443f558fb819d6c1c43c9a3292d0e1dfc4300d4eecdab27f",
+  "parts_junsa/seat_pen2.png": "962520c22e07c4396b204e16f3a332a339b6551a191ac556c18847b330e20575",
+  "parts_junsa/seat_type.png": "6633b0203c77c45181b2378f10de01d39c3d97b8cc653e3b2b20b41e6540822e",
   "parts_junsa/smile.png": "32a7d28a8880324facfa0ffd981fada92264a3992624024f2ab15e40f7f2493f",
   "parts_junsa/skins/maid/arm_key.png": "97ce3a57a1def7b1c22157bac71b7beae76cfe9d72a2fff455725bb06b0e24bd",
   "parts_junsa/skins/maid/arm_pen.png": "472aa90755a4bdb27096ec5e9edfb12fec384b64e42ddaf2552ff5953ab6c352",
@@ -309,6 +314,8 @@
   "stickers/__init__.py": "d77e3dc92cb353dced8d192c140643c6458bc3901facdf2e0a0d0830fa4244b7",
   "youtube_player.py": "33dd7fc8cf781b8b8a37c1a60a54b7506ebce5b44399d28fc0841d143d19e70c"
  },
- "notes": [],
- "silent": true
+ "notes": [
+  "타이머 안정성",
+  "소품 추가"
+ ]
 }
