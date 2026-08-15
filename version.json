@@ -1,7 +1,7 @@
 {
- "version": 1786836619,
+ "version": 1786837279,
  "files": {
-  "mascot.py": "d41e2f26686a3096a1cb9c600e02dede82ade40dbf8622e6a5ad4faf5b142dd2",
+  "mascot.py": "b0804ce91432bb494b3792a6fb230b024389e81ee2f1a065cae2c8aa3296e216",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -11,6 +11,7 @@
   "parts_junsa/desk.png": "8671bad069fe53399df68ebfe6a1a1a298e9aa4c26f1bd8df3016b5bb79fb76f",
   "parts_junsa/eyes_closed.png": "fd094c16062b4d1af4274220b785fc748195ebc406bffe2673e82d3978f09e15",
   "parts_junsa/hair.png": "3d23e3c2e207b1c5d71dfebf13514aad842faf1599c708244fb4ddaae931a3ba",
+  "parts_junsa/hand.png": "14fcba700a6266576b2d5a5e8d6aa308f53ff0d00008e93ee51526d08eec067f",
   "parts_junsa/hat.png": "4bd1da80b760cff3694c7b21350e8dce6a177026846dcd737d796ad7560f277f",
   "parts_junsa/head.png": "12b8d27857a0cf5354776fd7dd8c23ae2d9cd245eb35eddb9fc0919a2cd869bc",
   "parts_junsa/lashes.png": "aea2649410308f66078d48f3d3580a523ba1cea34252c75aee8e9ef65d6d7ab8",
