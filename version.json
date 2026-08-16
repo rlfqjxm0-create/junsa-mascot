@@ -1,7 +1,7 @@
 {
- "version": 1786893256,
+ "version": 1786893600,
  "files": {
-  "mascot.py": "7a2e948d277ba77649a49c65c6d494e638f4b06dcb8982a35e794383c7c02fbe",
+  "mascot.py": "16a309c98a0ce00f44a4536564d214719ae4697b284a3f3eadf7678b5d877751",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -327,6 +327,9 @@
   "stickers/__init__.py": "d77e3dc92cb353dced8d192c140643c6458bc3901facdf2e0a0d0830fa4244b7",
   "youtube_player.py": "33dd7fc8cf781b8b8a37c1a60a54b7506ebce5b44399d28fc0841d143d19e70c"
  },
- "notes": [],
- "silent": true
+ "notes": [
+  "목표를 다 채우면 파티 모자를 써요\n게이지가 100%가 되면 홈에서 내 캐릭터가 고깔모자와 화관을 써요. 친구들 화면에도 똑같이 보이니 다 채우고 자랑해 보세요.",
+  "창이 깜빡이던 것을 고쳤어요\n할 일 추가나 노래 추천 창이 계속 깜빡거리던 문제를 고쳤어요. 이제 조용히 앞에 있어요.",
+  "홈 창이 보통 창이 됐어요\n홈이 늘 맨 위에 떠 있지 않아요. 다른 창을 누르면 뒤로 내려가고, 작업표시줄에서 다시 불러올 수 있어요."
+ ]
 }
