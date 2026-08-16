@@ -1,7 +1,7 @@
 {
- "version": 1786902793,
+ "version": 1786903620,
  "files": {
-  "mascot.py": "25fd99325741d2e36c507454eb51c9dc9c0c0af80316e75eb93d20eb0f011017",
+  "mascot.py": "c2ee07b5210ecefcc28bbee534fd840b7d31ff3721e3ba6ede48e8cbd5122a93",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -360,9 +360,6 @@
   "stickers/__init__.py": "d77e3dc92cb353dced8d192c140643c6458bc3901facdf2e0a0d0830fa4244b7",
   "youtube_player.py": "33dd7fc8cf781b8b8a37c1a60a54b7506ebce5b44399d28fc0841d143d19e70c"
  },
- "notes": [
-  "간식을 주면 가끔 스페셜 컵케이크가 나가요\n기뽀님이 캐릭터마다 하나씩 그려 준 컵케이크예요. 간식을 주다 보면 가끔 내 캐릭터의 컵케이크가 나가고, 받은 캐릭터는 샤라랑~ 반짝이며 한참 웃어요.",
-  "홈을 내 그림으로 꾸밀 수 있어요\n반응 단추 줄 오른쪽 '꾸미기'에서 배경과 방 칸 그림을 고를 수 있어요. 방 칸 그림은 친구들 화면의 내 칸에도 똑같이 보여요.",
-  "글씨가 더 예뻐졌어요\n프리텐다드 글꼴을 품고 나와요. 따로 설치하지 않아도 모든 창의 글씨 모양이 더 또렷해져요."
- ]
+ "notes": [],
+ "silent": true
 }
