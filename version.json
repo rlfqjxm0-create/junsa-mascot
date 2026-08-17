@@ -1,7 +1,7 @@
 {
- "version": 1786938380,
+ "version": 1786939128,
  "files": {
-  "mascot.py": "4328389c7c2a9540694d7380e58b9408e5ea246258abe73ea7a82aaa331bf53b",
+  "mascot.py": "52b22f36b805a9847395b5ed9478be8a3b1b49b2ffebba8f01fed0ae0940f1fc",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -36,12 +36,12 @@
   "parts_junsa/prop8_back.png": "5f83dfc42fba4e7e4ab37a1d53b856463a0e55ddac5a0c25e6f31ed4ecbfe8db",
   "parts_junsa/prop9.png": "f3708e680e77d73e8dc34c27aaee073fbcd13360925a9ed6747a615b8bacd599",
   "parts_junsa/pupils.png": "942f010b921cfe0c4f4e8b22a7d8685c8139ee78c29f07ec835ee07cc04aaec9",
-  "parts_junsa/seat.png": "f6e34b1731bfce7acf76c01d123347cb7105cd480385feda89a7f0f7994e1d22",
-  "parts_junsa/seat_idle.png": "f9a629d7b3d123eeefc9c3abf3d9af8ca5616f6a9385ca8efc1637576a59e3f6",
-  "parts_junsa/seat_meta.json": "f84fcb0220e22dc4922b8de384634b8e062c775764641596e5e9541b45d2605b",
-  "parts_junsa/seat_pen.png": "2b7b50db27fd3a3548932b1ddb2ec41080419cef10a8be5108f1e83ac739bea1",
-  "parts_junsa/seat_pen2.png": "e677c1927127e903456e0f950cad25c0a75f60ea90590879d8b78fe24bfa92bb",
-  "parts_junsa/seat_type.png": "6c343e24bdbe28059cf981f920edbb68c7763eff30c9473500df2ba5864de6c7",
+  "parts_junsa/seat.png": "1324c13296b108fbd8b1f1ab9461a8ca3592a735a30763dde59efce899bf749d",
+  "parts_junsa/seat_idle.png": "8196a06f04e568f569802e257dead03996ecfe48790f607b5daac2a35fe12d45",
+  "parts_junsa/seat_meta.json": "87f5be11512313817699869518e58751e6f3f4ccb4f2978154b04391b90593c6",
+  "parts_junsa/seat_pen.png": "40393533078631c83a645c416b5e477de9ca7674be165b8abbe3be93e7ae5d6d",
+  "parts_junsa/seat_pen2.png": "95311da6feaaaedc704e8c161da9f96e391a46dd4633d216f8d0df3e9a85b5aa",
+  "parts_junsa/seat_type.png": "989b24a0f642e77ccd1af01aaf6143ae158a899e8bef75be782aff97f660d9b4",
   "parts_junsa/smile.png": "32a7d28a8880324facfa0ffd981fada92264a3992624024f2ab15e40f7f2493f",
   "parts_junsa/fonts/Pretendard-Bold.otf": "2e91915fab54df71cc9598ebf608b2bdb54c6fe3c066ac61dff0bc44fca71cc7",
   "parts_junsa/fonts/Pretendard-Regular.otf": "3ffbacde6ab8411f1d2db54bb9b1f0b3ee2a738932033722cf0388c06aed1c93",
@@ -361,6 +361,9 @@
   "stickers/__init__.py": "d77e3dc92cb353dced8d192c140643c6458bc3901facdf2e0a0d0830fa4244b7",
   "youtube_player.py": "33dd7fc8cf781b8b8a37c1a60a54b7506ebce5b44399d28fc0841d143d19e70c"
  },
- "notes": [],
- "silent": true
+ "notes": [
+  "레벨과 작업 시간을 되돌렸어요\n사고로 Lv.1이 되어 버린 레벨을 마지막 기록으로 복구했어요(퀸시 15·기뽀 12 등). 작업을 안 했는데 찍히던 유령 시간과, 하루가 지나도 안 꺼지던 게이지도 고쳤어요.",
+  "홈 꾸미기가 편해졌어요\n그림 고르기 단추를 고쳤어요(그동안 안 눌렸어요). 꾸미기 창을 연 채로 홈 화면에서 그림을 끌면 위치가 움직이고, 불투명도 조절과 반응 단추 색 고르기도 생겼어요.",
+  "하늘·간식·메이드복\n타이틀 하늘에 구름과 별이 골고루 퍼지고 양옆에 나무가 섰어요. 간식은 이제 세 입에 나눠 먹어요. 준사는 홈에서 메이드복을 입고 있어요."
+ ]
 }
