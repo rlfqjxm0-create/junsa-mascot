@@ -1,7 +1,7 @@
 {
- "version": 1786968163,
+ "version": 1786970166,
  "files": {
-  "mascot.py": "8de53600f8be4042c3961ef6f3099c797556232956c1440c26a549217275b0e9",
+  "mascot.py": "f9abb5b8a4adf390c835d57c7e8fb4aa7bac9fcf39345c9697f6fd0d260a49fd",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -36,12 +36,12 @@
   "parts_junsa/prop8_back.png": "5f83dfc42fba4e7e4ab37a1d53b856463a0e55ddac5a0c25e6f31ed4ecbfe8db",
   "parts_junsa/prop9.png": "f3708e680e77d73e8dc34c27aaee073fbcd13360925a9ed6747a615b8bacd599",
   "parts_junsa/pupils.png": "942f010b921cfe0c4f4e8b22a7d8685c8139ee78c29f07ec835ee07cc04aaec9",
-  "parts_junsa/seat.png": "092a3df4fbc82ba8288e60ab9ea3af2d04f3dcf176da9b015aae5f4d53c31d0d",
-  "parts_junsa/seat_idle.png": "a8df3b2d9517e18a57b72f40144d2ea7dc77f67f1d8939eebbe6cc11d7fb80c9",
-  "parts_junsa/seat_meta.json": "eaf498a2538f1b5d91bfbbf7889a79d239d0d2df34af861b88af3fbab0fd73a1",
-  "parts_junsa/seat_pen.png": "391a04d6d2489f3f7a6416824e65081ec0aace4dd6e4b8d2a680354776d64dac",
-  "parts_junsa/seat_pen2.png": "18a640348bcf96f6ad6d75fa1b45d2343cd2d4db18cc6080af2206f83206bda6",
-  "parts_junsa/seat_type.png": "14bf7253f1fd0dad8534c49cc6d152610d8c100f104fc3c7e5032f31bc161e7f",
+  "parts_junsa/seat.png": "54364b751aa353324408237833e21cfa360c53b9c058f69e5e384cd26b240a89",
+  "parts_junsa/seat_idle.png": "6012862f895f13b47b8b699fd4d58037c7d35e719ab43f3a3598cbd1b3faeb1c",
+  "parts_junsa/seat_meta.json": "7161c7ce17e5f8b130427396b68d49d06d11fbe3b6f858e2960de51049634409",
+  "parts_junsa/seat_pen.png": "bc3a8b027b1411b0018fe4e195a0022cfd332b4c87f096bcd65a8771143fa2c7",
+  "parts_junsa/seat_pen2.png": "c38f78c291e1f038df8e193786d312e0112f6c9ae86ef37d286c0e441911a460",
+  "parts_junsa/seat_type.png": "c27bbc1d6a8d8d3184227caa5374ddee7a759a2428413db8c90f2c1d80b7feeb",
   "parts_junsa/sky_dawn.png": "588c23959f0f6af3c8a5f75fb7eb14ed64d4e8ed567b04bddcf9c2592726c2c1",
   "parts_junsa/sky_day.png": "8c836f9d19bfde652386227be759bd3cea9ead31c54f35c46eb639a74502445e",
   "parts_junsa/sky_dusk.png": "357d5a58d58536cd07f06f291be1ea7be6866846a7b83c985a0bcd9af833f321",
@@ -366,6 +366,11 @@
   "stickers/__init__.py": "d77e3dc92cb353dced8d192c140643c6458bc3901facdf2e0a0d0830fa4244b7",
   "youtube_player.py": "b24fce8125c2234285ae5f8dfbb612eb879c8897476d7fbfcc04856057e42e76"
  },
- "notes": [],
- "silent": true
+ "notes": [
+  "홈 왼쪽 아래 '모두 보기' 단추 — 전원이 캡슐로 한 화면에! (심플모드)",
+  "캡슐엔 레벨·칭호·한마디 말풍선·노래·게이지가 함께 나와요",
+  "캡슐 배경은 테마색이 그 사람의 방 이미지로 녹아들어요",
+  "심플모드에서도 숨쉬기·음표·반짝임이 살아 있어요",
+  "준사의 홈 모습이 입고 있는 메이드복으로 보여요"
+ ]
 }
