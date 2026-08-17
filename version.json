@@ -1,7 +1,7 @@
 {
- "version": 1786940194,
+ "version": 1786940485,
  "files": {
-  "mascot.py": "8570885b9044ce51ac5bfe3f3d52382390ea3d5431464cec59d8b58bc111c213",
+  "mascot.py": "151cca62347240ef10b95aa714540294575e8c923893f2df06ab2ddc58d4a0a5",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -361,9 +361,6 @@
   "stickers/__init__.py": "d77e3dc92cb353dced8d192c140643c6458bc3901facdf2e0a0d0830fa4244b7",
   "youtube_player.py": "33dd7fc8cf781b8b8a37c1a60a54b7506ebce5b44399d28fc0841d143d19e70c"
  },
- "notes": [
-  "방 칸 그림이 이제 진짜로 보여요\n서버가 그림 실은 신호를 조용히 버리고 있었어요. 고쳤으니 내가 꾸민 방 칸이 친구들 화면에도 그대로 나타나요. 홈을 켜 두면 1~2분 안에 보입니다.",
-  "그림·색 고르기 창이 숨지 않아요\n꾸미기에서 그림 고르기를 눌러도 창이 안 뜨는 것처럼 보이던 문제 — 사실은 꾸미기 창 뒤에 숨어 있었어요. 이제 앞으로 뜹니다.",
-  "홈은 언제나 3열이에요\n창을 옆으로 넓혀도 칸이 5열로 눕지 않아요. 맥에서도 윈도우와 같은 모습입니다."
- ]
+ "notes": [],
+ "silent": true
 }
