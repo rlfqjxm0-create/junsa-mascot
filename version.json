@@ -1,7 +1,7 @@
 {
- "version": 1786959365,
+ "version": 1786959865,
  "files": {
-  "mascot.py": "63d2cdf1b567a7e097fb5f3b066269e02a28278e2eacf075f445c56d072cf7d8",
+  "mascot.py": "199d85d77e357e754a2a8f507ebd8baf7d3c20cb9523ed9167faef1b64462e46",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -361,6 +361,10 @@
   "stickers/__init__.py": "d77e3dc92cb353dced8d192c140643c6458bc3901facdf2e0a0d0830fa4244b7",
   "youtube_player.py": "b24fce8125c2234285ae5f8dfbb612eb879c8897476d7fbfcc04856057e42e76"
  },
- "notes": [],
- "silent": true
+ "notes": [
+  "새 주민 '락스'(까만 고양이)가 이사 왔어요 — 홈에서 만나요",
+  "홈 디자인 단장 — 카드 그림자, 부드러운 단추, 커진 타이틀 하늘",
+  "게이지가 각자 테마색 그라데이션으로 바뀌었어요",
+  "하늘 밝기에 따라 홈 글자색이 저절로 바뀌어요"
+ ]
 }
