@@ -1,13 +1,13 @@
 {
- "version": 1787153793,
+ "version": 1787171314,
  "files": {
-  "mascot.py": "c318a0ba08b6db5a34e148b8b5a322a652b566d1e877826ade1817d3b8f0eae6",
+  "mascot.py": "248ca93288f5ca1bd90eaaef919eed951f88fde618921f9aae399491d781ee1d",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
   "parts_junsa/arm_right_typing.png": "d3da01f7573f7078ec82316e7b7c3bf7e1d99123bcf02b15bec14ac92eee13c0",
   "parts_junsa/body_open.png": "a95f2555907c3a0d7e57dc71df1ed44f9b7cfa1d321071e82f4cca5c011fa669",
-  "parts_junsa/config.json": "03cc2beed82bc54826da88740c5ba7a4154b0baba38993908c72d46eab4aada6",
+  "parts_junsa/config.json": "e60a4eb2344768bc3e9678f8e22401fd94dea12c784ef78a8874d763184177d8",
   "parts_junsa/crown.png": "b1b7426a0222ac294a782cb06db6c9c4aba4e660591dd1761dc9e4da050175fc",
   "parts_junsa/desk.png": "8671bad069fe53399df68ebfe6a1a1a298e9aa4c26f1bd8df3016b5bb79fb76f",
   "parts_junsa/eyes_closed.png": "ba7c5b7d43b94874421e69d89e220b192fc3ec8073370ec3a8bbcd97cd0f20a0",
@@ -148,6 +148,8 @@
   "parts_junsa/sounds/banana split stock/banana-s-6.wav": "48cfd2717239effe50951f4096646d59e310f5d71c2e3d9324690038ca35af41",
   "parts_junsa/sounds/banana split stock/config.json": "3df3707c1f68b7cf7ded5b5456bfc2858023e246d614c6028164126a6a6c8db0",
   "parts_junsa/sounds/banana split stock/LICENSE.txt": "2e8578f16b6ea265412166e8b4b1da045fcc11f28db03d664908410124a2f01e",
+  "parts_junsa/sounds/ctile/pop/pop1.wav": "dc1c5535c83779e4a41bf21857659275e3954aab2ff2b6b4e58217b4a0d23162",
+  "parts_junsa/sounds/ctile_bgm/bgm.wav": "e8f3390c041b05caf07ee869ab0842b7ff38cdc81fb78b92d2a7222bc8f028d3",
   "parts_junsa/sounds/frog mini/config.json": "f3d63d0dc8b12d5fc611efb6463516ce50ef75eca87e57ca69247d8a1cd6e6c6",
   "parts_junsa/sounds/frog mini/frogmini-back1.wav": "b30155e8242b6b092c10dbd909ac29212597aedeaa24ca5e3e37a952e0ce6696",
   "parts_junsa/sounds/frog mini/frogmini-enter1.wav": "e1e62c4ffb7ec5f3ce24f2e8f045a9957915ac73e1335afc3bbc6a492b80760c",
@@ -163,6 +165,7 @@
   "parts_junsa/sounds/frog mini/frogmini-key9.wav": "cdebed9101f9b6bfb0bf973f2678a1ef888063d0256290b6167c26de21d6f37a",
   "parts_junsa/sounds/frog mini/frogmini-shift1.wav": "d3e46fbbbb2c19d4b2cebb017edbd44504120ed55b3f8e219bc8e216f810ca19",
   "parts_junsa/sounds/frog mini/frogmini-space1.wav": "1d063dcd83cd578229b9c01aed47dfb57116eb6fdbe6d650604bedd50396593b",
+  "parts_junsa/sounds/gameover/over1.wav": "98f0544212192e5c718ef3fbe3594f427de5c49b1fdfd59cb7ad65246dbcabb2",
   "parts_junsa/sounds/Gateron Black Ink - Revolt/config.json": "fd2ba9ead98d013f43b54f7d365919d1e3f784e3adc9a5d3968eff8529dbc242",
   "parts_junsa/sounds/Gateron Black Ink - Revolt/Gateron Black.wav": "7e743b05e2c521523bb173cc68c145b628045acbc485599a8d39d57095d0c432",
   "parts_junsa/sounds/link65 gold/config.json": "6f6225a5b64efdc73c76039d0081263f6dc402979af3a988c351161f64c01e88",
@@ -226,7 +229,7 @@
   "parts_junsa/sounds/pen/clip_6.wav": "ffdb7c929f56e1f27bca1322413e3355497e013248727ccbe940965686b6144e",
   "parts_junsa/sounds/pen/sustain.wav": "8d6c2a284c4c9c03ce58e97fdb3f8ca2f6a930be01173e7b32987ca8fa5815d8",
   "parts_junsa/sounds/poke/poke.wav": "5b4691361a56af9c93ba9ea7429715d60941784d82afcfc715a07b733b4ff213",
-  "parts_junsa/sounds/pomo/start.wav": "86557d3d8ac5f43db53f3927797f02414e7d9d5b4cc56eba409d459c1c32037d",
+  "parts_junsa/sounds/pomo/start.wav": "e0a752a4c4b586580e49ebc901079734e87831dc39327733326a43719e2bde98",
   "parts_junsa/sounds/Razer Green (Blackwidow Elite) - Akira/alt.wav": "31983a24e5a0190043efcee356d5ad0ecf1d120c761b2dcfc38bac5737cfae77",
   "parts_junsa/sounds/Razer Green (Blackwidow Elite) - Akira/back.wav": "8531c65d5c8ae0d39ae927e95c67c9793152ac5a621804c583d017aed3f7008d",
   "parts_junsa/sounds/Razer Green (Blackwidow Elite) - Akira/caps.wav": "9dcb05127433771017532e0a541d5638da3af030c638d8e0b3c20b309d0e9459",
@@ -438,7 +441,7 @@
   "parts_junsa/sounds/wgame/merge/merge5.wav": "7d5fae96532888841b8f79334c3782afc5e65845140cb5c2999a4b925b86f433",
   "parts_junsa/sounds/wgame/merge/merge6.wav": "19aca917bab5520472c1572f9a9454d3ebcf6d58f128dbe7c0c27afaa294f557",
   "parts_junsa/sounds/wgame/merge/merge7.wav": "1a0fa10342c6082de3759b725418c654b4a2359fb49caa33ab621a720c3c1453",
-  "parts_junsa/sounds/wgame_bgm/bgm.wav": "fb72573434f72592457ebe09806225e7b3d1748202ee5c8b767d79e1a1f54a58",
+  "parts_junsa/sounds/wgame_bgm/bgm.wav": "a868a90ed84914d20e4bc27991db01f77e4bac8fb5f20da87f78c3076543ebb4",
   "parts_junsa/stamps/bud.png": "6b2b3f6c5b57f26e6b80123d766f8e2e391ade3668f3fd0f7b1686723e67ae8c",
   "parts_junsa/stamps/flower.png": "ed5b9ece5130a07c400974ede9f79a0d1ba23a61621f9b0a105d3d59279bc2fe",
   "parts_junsa/stamps/sprout.png": "7fc5debfff894594c7ff5d2905de9ede3182d3f36365d5cfb24ab77f2c815036",
@@ -450,6 +453,12 @@
   "stickers/__init__.py": "d77e3dc92cb353dced8d192c140643c6458bc3901facdf2e0a0d0830fa4244b7",
   "youtube_player.py": "b24fce8125c2234285ae5f8dfbb612eb879c8897476d7fbfcc04856057e42e76"
  },
- "notes": [],
- "silent": true
+ "notes": [
+  "**새 게임 '컬러타일'이 생겼어요!** 홈 아래 오른쪽 '메뉴'에서 열 수 있어요. 타일이 없는 빈 칸을 누르면 위·아래·왼쪽·오른쪽으로 가장 가까운 타일을 하나씩 보는데, 그중 같은 얼굴이 둘 이상이면 사라져요. 판을 다 지우는 게 목표! 물음표(?) 단추를 누르면 게임 방법과 요령이 나와요 (요령 하나만 미리 말하면 — **셋이 한꺼번에 지워지는 자리는 피하세요.** 홀수로 지우면 짝을 잃은 타일이 끝에 남아요)",
+  "**게임이 끝나면 캐릭터가 축하해 줘요.** 폭죽이 터지고 한마디 건네요. 바로 아래 큰 단추로 다시 시작할 수 있어요. 끝날 때 나는 소리도 새로 생겼어요",
+  "**수박게임·컬러타일에 모두의 랭킹이 생겼어요.** 친구들 최고 점수를 닉네임과 함께 5위까지 보여 주고, 1·2·3위는 금·은·동으로 표시돼요. 예전에는 사람마다 순위가 달랐는데(서로 접속한 적이 있어야 보였어요) 이제 아는 기록을 서로 전해 줘서 다 같은 순위가 보입니다",
+  "수박게임 머리들이 **덜 통통 튀게** 했어요. 브금도 한 바퀴 돌 때 뚝 끊겼다 살아나던 것을 매끄럽게 이었어요",
+  "뽀모도로 알림음이 **잘 들리게** 커졌어요 (소리는 나고 있었는데 다른 소리의 절반 크기라 안 들렸어요)",
+  "그 밖에 — 게임 화면을 더 아기자기하게 다듬었고(글자에 테두리, 알약 모양 게이지, 굵어진 테두리), 여러 자잘한 손질이 있어요"
+ ]
 }
