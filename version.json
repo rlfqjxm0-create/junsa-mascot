@@ -1,13 +1,13 @@
 {
- "version": 1787313911,
+ "version": 1787397523,
  "files": {
-  "mascot.py": "6bfbe4226d7f4e275b62aeb29597d9cddc9a90c4db0b96e4c042f6692d0a3412",
+  "mascot.py": "5a6d164754a52bca37572f7c31cbb5e668fe6224ea6641494cbf0eac7733ef1b",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
   "parts_junsa/arm_right_typing.png": "d3da01f7573f7078ec82316e7b7c3bf7e1d99123bcf02b15bec14ac92eee13c0",
   "parts_junsa/body_open.png": "a95f2555907c3a0d7e57dc71df1ed44f9b7cfa1d321071e82f4cca5c011fa669",
-  "parts_junsa/config.json": "6644a6f4b55dad6132540b7bb373d594d636a0565dd72393edea349653366481",
+  "parts_junsa/config.json": "0b974aff79b0af926f9078a1c824aa389cfbd0afcb28cd19ec5197042d179055",
   "parts_junsa/crown.png": "b1b7426a0222ac294a782cb06db6c9c4aba4e660591dd1761dc9e4da050175fc",
   "parts_junsa/desk.png": "8671bad069fe53399df68ebfe6a1a1a298e9aa4c26f1bd8df3016b5bb79fb76f",
   "parts_junsa/eyes_closed.png": "ba7c5b7d43b94874421e69d89e220b192fc3ec8073370ec3a8bbcd97cd0f20a0",
@@ -16,7 +16,7 @@
   "parts_junsa/hat.png": "4bd1da80b760cff3694c7b21350e8dce6a177026846dcd737d796ad7560f277f",
   "parts_junsa/head.png": "12b8d27857a0cf5354776fd7dd8c23ae2d9cd245eb35eddb9fc0919a2cd869bc",
   "parts_junsa/lashes.png": "aea2649410308f66078d48f3d3580a523ba1cea34252c75aee8e9ef65d6d7ab8",
-  "parts_junsa/layout.json": "9e487ff052af5afbd24d5ad47843bb9138dec41063579dc4db3f407a3f0180cf",
+  "parts_junsa/layout.json": "0aa50dded96cbe9112be81d5427c61f0ea4a8f7a538f31c8750d74b098aa86b3",
   "parts_junsa/pet1.png": "ccf3ec92d18fe787212a98d1a1bbc0b70383d565332d5f95dbe5de4cf14e13b2",
   "parts_junsa/pet2.png": "664cde3775e26d09b22534a5e995bf9c1e7e4e1040396553ec3ef7c9ec1fd243",
   "parts_junsa/prop1.png": "c6c932bcbd39f1a7052d9741c8b040135ff46af612bd21a17e9ce29e798c88db",
@@ -25,7 +25,23 @@
   "parts_junsa/prop12.png": "8695e3a96e06a2f1ccd88c656e3b89849b01d63ee78fd97f7ca1f855ad55e541",
   "parts_junsa/prop13.png": "a0fdd1fdebbe4a9de0c7d34276c53ce9c9ed9d044b85eac7464d7e75aa71cbcf",
   "parts_junsa/prop14.png": "f287103ec83d2880ec7352fb85842da7b68c7b9c72c68858cd6b44c94268323f",
+  "parts_junsa/prop17.png": "fc7f2ccf06c553349622d63d4ced84fe8fdadb9361b46988b7f1431a3caee7b3",
+  "parts_junsa/prop17_bit2.png": "52fb61637f4bbce67d5ea98c7981610014acbba8451ebc8b87255278963b8ec3",
+  "parts_junsa/prop17_bit3.png": "9569bf7def5b95c2c694b4108a53cadc87a02ea494fd9bf11cd27285d36533f1",
+  "parts_junsa/prop17_bit4.png": "50451e441edf2e5ac22a3d474be0e9cd26a944ce7d7aacf05b4fe63f9d30507a",
+  "parts_junsa/prop18.png": "d15ce6506c2fc4e0577f2bf73459ea08c58f5d241e1eb944acd3fda181dc215f",
+  "parts_junsa/prop19.png": "920ef9273fba77776e17ffef773306f9e03deb071436ccd5d1bc3dca2d761a45",
   "parts_junsa/prop2.png": "9bc9d054486d8bae5265b8e32578f2775e46a282454d2507d7928bca65e2f139",
+  "parts_junsa/prop20.png": "9e2e70132625c0848b916b9b034adb23c29e70f23afbb433ec2e1c9dc884c400",
+  "parts_junsa/prop20_bit2.png": "584a038aea582f3001b040e42ee979198f75dbcfdf5aa78ae74579df24da629c",
+  "parts_junsa/prop20_bit3.png": "42c121c9ec22d9007cbc64b3475b90712676c5b37bdc1354bbf7b7728acc833e",
+  "parts_junsa/prop20_bit4.png": "93861ea049efbb9f4bce63a1afc4acd10a6178bec27d72f8a7c49f3e2d0fe9a1",
+  "parts_junsa/prop20_bit5.png": "4809bfecce45ab9f6547eae523dc13ae736b86a9330e9961e6eefcf3f417a8c6",
+  "parts_junsa/prop21.png": "66a57bddeeba14b6b5a426b4e2baf9c9d511cbb1091df36fee374157c362adaa",
+  "parts_junsa/prop21_bit2.png": "d58d2e52c560028a8d2fbd72607d300e4497ab90c74b6f151f75c4ba9e39f840",
+  "parts_junsa/prop21_bit3.png": "a57385959d741788e857aa42d6234573f4b9abba5b57840da59cc4e0ec120159",
+  "parts_junsa/prop22.png": "b19c9e8b0e6741bcadfba94773f02d6bee419210c24d4ebbcf2b85caa6d7444e",
+  "parts_junsa/prop23.png": "ecf6e1c9e1af2544d425e4950c6a54cab51e131368e439eea4ac9f5e8914d5f8",
   "parts_junsa/prop3.png": "c747b74d6f50d0a99ff15c96512b0fc53865a8796d88df9686442df5a1df7f97",
   "parts_junsa/prop4.png": "32c2dc907ceff321fc76755798a8cf69bda1d1f5c5c54ffd5e697309542e38fe",
   "parts_junsa/prop5.png": "3d1606bffed33ba36d0c8e9cf31641ea44d720c6a6a18f345454150333e643da",
@@ -480,8 +496,8 @@
   "youtube_player.py": "8fd216056f4f61075a8646a791389b05ad0082c40864d84b16773c2302c74f2d"
  },
  "notes": [
-  "**컬러타일에서 틀린 자리를 짚으면 소리가 납니다.** 지난번에 넣었다고 알려 드렸는데 실제로는 한 번도 안 났어요 — '틀렸다'를 빈 목록으로 알리는데, 감싸 둔 함수가 그것을 빈 글자로 바꿔 버려서 소리를 내는 가지가 아예 안 불렸습니다",
-  "**홈 메뉴의 '?' 를 '설명서'로 바꿨습니다.** 옆 단추들이 다 이름인데 혼자만 기호라 무엇인지 알아보기 어려웠어요",
-  "**준사 메이드복에서 소품이 제자리로 왔습니다.** 옷마다 파츠가 통째로 옮겨져 있는데 소품만 원래 옷 좌표로 놓여 전부 아래로 처져 있었어요"
+  "**사가님이 소품 7종을 추가해 줬어요!** 미쿠 · 생선 · 계란 · 블록슈 불꽃 · 츠나 불꽃 · 당근토끼 · 방울고양이. 다들 사가님께 감사의 채찍질을 해주세요.",
+  "**미쿠와 불꽃은 여러 조각이 따로 움직입니다.** 미쿠는 양갈래가 흔들리고 파를 든 손이 신나게 움직여요. 불꽃은 밑동을 붙박이로 두고, 겹쳐 놓은 안쪽 불꽃마다 박자를 어긋내 타오르듯 넘실거립니다",
+  "소품은 켤 때마다 하나가 무작위로 나옵니다. 켜 둔 채로 바꾸고 싶으면 **우클릭 → 소품 새로고침**을 누르세요"
  ]
 }
