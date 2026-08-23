@@ -1,13 +1,18 @@
 {
- "version": 1787502036,
+ "version": 1787510827,
  "files": {
-  "mascot.py": "fbdf8e3b21e2e769672acc47f67dbba3222fd2cafeac680900afe954c577a708",
+  "mascot.py": "1ebc3f40211c242fa74bdde44d1cff3226dd642e0e392e90acee45a059fb12aa",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
   "parts_junsa/arm_right_typing.png": "d3da01f7573f7078ec82316e7b7c3bf7e1d99123bcf02b15bec14ac92eee13c0",
   "parts_junsa/body_open.png": "a95f2555907c3a0d7e57dc71df1ed44f9b7cfa1d321071e82f4cca5c011fa669",
-  "parts_junsa/config.json": "5ee85cae84c8ff1cb96e3dfd4b654f0e57ba9544dce15cb20b2be33297233163",
+  "parts_junsa/chip_food.png": "420182c25bd0673a57be7e9532da4c6fff94fd768744833b96852ef1e77ed2c1",
+  "parts_junsa/chip_game.png": "165aa9a6737c5dcec6462762d2103703f13cec2641f97a4c131f97ebc5d7cbff",
+  "parts_junsa/chip_kernel.png": "bb58ea688ae34da877aaa8f3daaa68e669e00997be2b28d78c4408c6e66c26e7",
+  "parts_junsa/chip_meta.json": "23214acfd87a7ae8ee65a7edf781386a54f29283c16fae815f47c8fc8f55413f",
+  "parts_junsa/chip_movie.png": "43bfa1493af45a8adc05b455acda466b56cad4394229cd8a706ae5cde09ed642",
+  "parts_junsa/config.json": "64351dc930662f2820574bc44d7e46124e6b47c49a75ebd3ceca6c3d064f2eda",
   "parts_junsa/crown.png": "b1b7426a0222ac294a782cb06db6c9c4aba4e660591dd1761dc9e4da050175fc",
   "parts_junsa/desk.png": "8671bad069fe53399df68ebfe6a1a1a298e9aa4c26f1bd8df3016b5bb79fb76f",
   "parts_junsa/eyes_closed.png": "ba7c5b7d43b94874421e69d89e220b192fc3ec8073370ec3a8bbcd97cd0f20a0",
@@ -495,6 +500,8 @@
   "stickers/__init__.py": "d77e3dc92cb353dced8d192c140643c6458bc3901facdf2e0a0d0830fa4244b7",
   "youtube_player.py": "958da4bd526d867ec8250db02da4729ceb168664c04419091fe6ebf040122f80"
  },
- "notes": [],
- "silent": true
+ "notes": [
+  "새 기능 '상태 칩' — 캐릭터 우클릭 → 상태 칩에서 지금 무엇을 하는 중인지 고를 수 있어요. 자리비움 · 게임 중 · 영화 감상 중 · 밥 먹는 중을 고르면 캐릭터가 그 행동을 하고, 홈의 내 칸에도 표시돼요. 원래대로 돌리려면 '온라인'을 고르면 돼요.",
+  "소품이 팔에 가려지지 않게 위로 올렸어요. 여러 겹으로 된 소품(불꽃 같은 것)도 안쪽 겹까지 제대로 나와요."
+ ]
 }
