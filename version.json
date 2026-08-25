@@ -1,7 +1,7 @@
 {
- "version": 1787691647,
+ "version": 1787692620,
  "files": {
-  "mascot.py": "fbbd51154d02b797fd8c4927f73b974fc08c82657ef60526e60ec725b2f1ec99",
+  "mascot.py": "1ce37ec906567ae0321bdd1b51a9f301e71ebc98c2781078f185015fb326c31a",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -507,7 +507,6 @@
   "stickers/__init__.py": "d77e3dc92cb353dced8d192c140643c6458bc3901facdf2e0a0d0830fa4244b7",
   "youtube_player.py": "958da4bd526d867ec8250db02da4729ceb168664c04419091fe6ebf040122f80"
  },
- "notes": [
-  "새 소품 4종이 왔어요 — 잠자는 고양이(가끔 눈을 뜨고 빤히 봐요), 김이 폴폴 나는 왕만두, 아기 쪽쪽이, 토끼 머리띠. '소품 새로고침'을 누르다 보면 만날 수 있어요."
- ]
+ "notes": [],
+ "silent": true
 }
