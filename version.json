@@ -1,7 +1,7 @@
 {
- "version": 1787709773,
+ "version": 1787715974,
  "files": {
-  "mascot.py": "018be95a9e3a5d7bb3d8bd20d600d438dc46a9ad7d7710fb8a518fa457c6946c",
+  "mascot.py": "5efb6f5198fe437b2ecbe25ecc283968d6357e03c0184e4e2d104530b016cd86",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -22,14 +22,14 @@
   "parts_junsa/hat.png": "4bd1da80b760cff3694c7b21350e8dce6a177026846dcd737d796ad7560f277f",
   "parts_junsa/head.png": "12b8d27857a0cf5354776fd7dd8c23ae2d9cd245eb35eddb9fc0919a2cd869bc",
   "parts_junsa/lashes.png": "aea2649410308f66078d48f3d3580a523ba1cea34252c75aee8e9ef65d6d7ab8",
-  "parts_junsa/layout.json": "42db7818ef4ec2639efca6980c2a51ee5bbf484521c75d5c9f299cd05f7e237a",
+  "parts_junsa/layout.json": "5d28795c5880e8ed166b51aa13b6eb3d2ac3bd0def9247e44e5c58c53000ea0c",
   "parts_junsa/pet1.png": "ccf3ec92d18fe787212a98d1a1bbc0b70383d565332d5f95dbe5de4cf14e13b2",
   "parts_junsa/pet2.png": "664cde3775e26d09b22534a5e995bf9c1e7e4e1040396553ec3ef7c9ec1fd243",
   "parts_junsa/prop1.png": "c6c932bcbd39f1a7052d9741c8b040135ff46af612bd21a17e9ce29e798c88db",
   "parts_junsa/prop10_back.png": "9c151b667a305e0b40917014640ebb0b599d65f77fbb44f467f973eb245a4198",
   "parts_junsa/prop11.png": "5018d089066acf04ff2118046d99d1112eacb9819345988f562674b49035022f",
   "parts_junsa/prop12.png": "8695e3a96e06a2f1ccd88c656e3b89849b01d63ee78fd97f7ca1f855ad55e541",
-  "parts_junsa/prop13.png": "d3c1bec681e9173bd2b4ef9382ee7a1a5fbe2e23f8161a3f8509e926e86b4f30",
+  "parts_junsa/prop13.png": "a0fdd1fdebbe4a9de0c7d34276c53ce9c9ed9d044b85eac7464d7e75aa71cbcf",
   "parts_junsa/prop14.png": "f287103ec83d2880ec7352fb85842da7b68c7b9c72c68858cd6b44c94268323f",
   "parts_junsa/prop17.png": "fc7f2ccf06c553349622d63d4ced84fe8fdadb9361b46988b7f1431a3caee7b3",
   "parts_junsa/prop17_bit2.png": "52fb61637f4bbce67d5ea98c7981610014acbba8451ebc8b87255278963b8ec3",
@@ -46,14 +46,21 @@
   "parts_junsa/prop21.png": "66a57bddeeba14b6b5a426b4e2baf9c9d511cbb1091df36fee374157c362adaa",
   "parts_junsa/prop21_bit2.png": "d58d2e52c560028a8d2fbd72607d300e4497ab90c74b6f151f75c4ba9e39f840",
   "parts_junsa/prop21_bit3.png": "a57385959d741788e857aa42d6234573f4b9abba5b57840da59cc4e0ec120159",
-  "parts_junsa/prop22.png": "9e159eefb2f8ea0156ada9f96bb5be20daf46b4841552d28d6d0ce3dfbb54d49",
-  "parts_junsa/prop23.png": "8a5e7570a35c1b49c72b92eb1e94a007adef6349cd4975960142aded81cc4a68",
+  "parts_junsa/prop22.png": "b19c9e8b0e6741bcadfba94773f02d6bee419210c24d4ebbcf2b85caa6d7444e",
+  "parts_junsa/prop23.png": "ecf6e1c9e1af2544d425e4950c6a54cab51e131368e439eea4ac9f5e8914d5f8",
   "parts_junsa/prop24.png": "2a3b1a7dc0516884a5a84a2433f690e3e269ab22bfcb9a4916357ef53021f89b",
   "parts_junsa/prop24_bit2.png": "5376641648882bb6e7411e2db4894e611582b682334918071c0e710d455888a6",
   "parts_junsa/prop25.png": "fa2b0bd486e87df1e54316f78d9c219874aa9fc0fe3fc47c8e38f8cdfaa1832b",
   "parts_junsa/prop25_bit2.png": "0c164a75abb81b157a715c8e560c01331b7256b3f34202c0971183fb6a2dc425",
   "parts_junsa/prop25_bit3.png": "f28b0164c2cc2817a54c3a1f952e18f3dd869695a2c9814b913311cace9a413b",
   "parts_junsa/prop25_bit4.png": "2f7bdf483649d9e2e412f893591ed376924c236b5c8ff94ec4703d5be9d7c029",
+  "parts_junsa/prop26.png": "9e159eefb2f8ea0156ada9f96bb5be20daf46b4841552d28d6d0ce3dfbb54d49",
+  "parts_junsa/prop27.png": "8a5e7570a35c1b49c72b92eb1e94a007adef6349cd4975960142aded81cc4a68",
+  "parts_junsa/prop28.png": "c315d250988fcdde710a7f255825dde190cd7b6efbecdb2a86501bcdf6850d7f",
+  "parts_junsa/prop28_bit2.png": "8f522ea292ca103e42b078d4d13540d4ee4eefb8ed949142c2b19219be8dad5f",
+  "parts_junsa/prop28_bit3.png": "8202a8dbcdb4f927b3b5c3cf914b91776a3802c31d76d83c8358e063023cf5d3",
+  "parts_junsa/prop28_bit4.png": "87b6189309f020caed2081a283b8959ffcc50bc8fc840e4a38cdd113b67cac41",
+  "parts_junsa/prop28_bit5.png": "8b1fbb74f518a725bbdabf22009d234440a45cb9edb1ec34f08bddbda93938f8",
   "parts_junsa/prop3.png": "c747b74d6f50d0a99ff15c96512b0fc53865a8796d88df9686442df5a1df7f97",
   "parts_junsa/prop4.png": "32c2dc907ceff321fc76755798a8cf69bda1d1f5c5c54ffd5e697309542e38fe",
   "parts_junsa/prop5.png": "3d1606bffed33ba36d0c8e9cf31641ea44d720c6a6a18f345454150333e643da",
@@ -516,6 +523,10 @@
   "stickers/__init__.py": "d77e3dc92cb353dced8d192c140643c6458bc3901facdf2e0a0d0830fa4244b7",
   "youtube_player.py": "0b2e0560b1bf72e55b8ab8623e3083a401842cdafe905a5a0186012617aee9bb"
  },
- "notes": [],
- "silent": true
+ "notes": [
+  "새 소품 4종이 왔어요 — 잠자는 고양이, 김이 폴폴 나는 왕만두, 아기 쪽쪽이, 토끼 머리띠. '소품 새로고침'을 누르다 보면 만날 수 있어요.",
+  "고양이를 클릭하면 야옹 하고 울어요. 고양이 머리를 살살 쓰다듬으면(드래그) 고롱고롱 소리를 내요.",
+  "모두의 플레이리스트에서 퍼오기가 막혀 건너뛰던 곡도 이제 재생돼요. 유튜브 프리미엄을 쓰신다면 음악 메뉴에서 한 번 로그인해 두면 광고 없이 나와요.",
+  "하독의 반려동물 고양이 비비도 있어요! 발과 꼬리를 살랑이는 비비를 클릭하거나 몸을 쓰다듬어 보세요."
+ ]
 }
