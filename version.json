@@ -1,7 +1,7 @@
 {
- "version": 1787879328,
+ "version": 1787899219,
  "files": {
-  "mascot.py": "d30b8fa02cbf563694ef7a243065ae63533529680b9c52ce55c76a40efcb6e0a",
+  "mascot.py": "fd918c5d2d1e5122ab27458a8f67b76d8f8209b3623dff0043ce015168835733",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -547,7 +547,8 @@
   "youtube_player.py": "0b2e0560b1bf72e55b8ab8623e3083a401842cdafe905a5a0186012617aee9bb"
  },
  "notes": [
-  "타이머와 캐릭터 사이 여백을 직접 끌어서 맞출 수 있어요",
-  "환경설정 → 표시 → '끌어서 맞추기' 를 누르고 캐릭터를 위아래로 끌면 저장돼요"
+  "채찍질을 받으면 이펙트가 제대로 나와요 (전에는 소리만 났어요)",
+  "리듬을 타거나 움직일 때 소품이 두 개로 겹쳐 보이던 것을 고쳤어요",
+  "시간이 지나면 캐릭터가 창 아래로 밀리던 것을 고쳤어요"
  ]
 }
