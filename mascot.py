@@ -6100,6 +6100,10 @@ class RoomNet:
     # 답(목록 본체)은 **명단(room_list)** 에 실려 오므로 명단만 자주 받으면
     # 된다 — 자리 알림·신호 받기는 그대로 둔다.
     HOT_LIST = 2.0
+    # **클래스에도 기본값을 둔다.** 감시견과 검사가 `RoomNet.__new__` 로
+    # 껍데기를 만들어 _loop 의 판단을 그대로 돌려 보므로, __init__ 에만
+    # 있으면 AttributeError 로 통신 바퀴가 통째로 죽는다 (지뢰 161).
+    hot_until = 0.0
 
     def __init__(self, slot, code=None, state=None):
         # 보낼 값은 **만들 때 같이 받는다.** 스레드가 __init__ 끝에서 바로
