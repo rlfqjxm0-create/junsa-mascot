@@ -507,7 +507,8 @@ function onYouTubeIframeAPIReady(){
                 enablejsapi:1},
     events:{
       'onReady':function(){ ready=true; applyPend(); send({ready:true}); report(); },
-      'onStateChange':function(e){ report(); if(e.data===0){ send({ended:true}); } },
+      'onStateChange':function(e){ report(); if(e.data===0){ send({ended:true}); }
+        if(e.data===1&&!fit){ try{player.setPlaybackQuality('small');}catch(x){} } },
       'onError':function(e){ send({err:e.data||1}); }
     }});
 }
@@ -515,6 +516,11 @@ window.ytLoad=function(v,list){ if(!ready){ pend={v:v,list:list}; return; } doLo
 window.ytPlay=function(){ if(player&&ready) player.playVideo(); };
 window.ytPause=function(){ if(player&&ready) player.pauseVideo(); };
 window.ytVol=function(x){ if(!ready){ pendVol=x; return; } try{player.setVolume(x);}catch(e){} };
+// 소리만 들을 때는 가장 낮은 화질로 묶는다 (맥북 팬이 돌지 않게).
+// 영상을 보일 때만 유튜브에 맡긴다.
+var fit=false;
+window.ytFit=function(on){ fit=!!on;
+  try{ if(!fit) player.setPlaybackQuality('small'); }catch(e){} };
 var t=document.createElement('script'); t.src="https://www.youtube.com/iframe_api";
 document.head.appendChild(t);
 </script></body></html>"""
@@ -548,10 +554,19 @@ def _mac_yt_player_main():
     #        보내므로, 안 막으면 곡 하나 끝에 ended 가 여러 번 나가
     #        부모가 다음 곡을 건너뛸 수 있다.
     st = {"mode": "iframe", "vid": "", "title": "", "vol": None, "home": "",
-          "loop": 1, "esent": False}
+          "loop": 1, "esent": False,
+          # 영상 보기 · 로그인 (요청)
+          "vid_on": False,      # 영상 칸에 들어가 있는가
+          "show": True,         # 지금 보여도 되는가 (부모가 알려 준다)
+          "login": False,       # 로그인 화면인가
+          "signed": None}       # 로그인돼 있는가 (모르면 None)
 
     def emit(d):
         try:
+            # 로그인 상태는 알게 된 뒤로 늘 같이 보낸다 — 부모가 이 값으로
+            # '유튜브 계정 · 로그인됨' 을 저장한다 (윈도우와 같은 열쇠).
+            if st.get("signed") is not None and "signed" not in d:
+                d = dict(d, signed=bool(st["signed"]))
             sys.stdout.write("@YT " + json.dumps(d) + "\n")
             sys.stdout.flush()
         except Exception:
@@ -722,11 +737,166 @@ def _mac_yt_player_main():
         AppKit.NSBackingStoreBuffered, False)
     win.setContentView_(web)
     win.setOpaque_(False)
+    # **배경색까지 비워야** 둥근 모서리 밖으로 시스템 창 배경이 안 남는다
+    # (setOpaque_ 만으로는 안 된다 — _mac_clear_bg 와 같은 이야기).
+    try:
+        win.setBackgroundColor_(AppKit.NSColor.clearColor())
+    except Exception:
+        pass
     win.setAlphaValue_(0.0)
     win.setIgnoresMouseEvents_(True)
     win.orderFrontRegardless()
     web.loadRequest_(NSURLRequest.requestWithURL_(
         NSURL.URLWithString_(st["home"])))
+
+    LOGIN_URL = ("https://accounts.google.com/ServiceLogin"
+                 "?continue=https%3A%2F%2Fwww.youtube.com%2F&hl=ko")
+    # 창을 만들 때의 모습 — 로그인이 끝나면 그대로 되돌린다
+    BARE = AppKit.NSWindowStyleMaskBorderless
+    TITLED = (AppKit.NSWindowStyleMaskTitled
+              | AppKit.NSWindowStyleMaskClosable
+              | AppKit.NSWindowStyleMaskMiniaturizable
+              | AppKit.NSWindowStyleMaskResizable)
+
+    def _flip(y, h):
+        """Tk 화면 좌표(왼쪽 위 기준) → 코코아(왼쪽 아래 기준).
+
+        코코아의 전역 좌표는 **주 화면**의 왼쪽 아래가 원점이다.
+        """
+        try:
+            return float(AppKit.NSScreen.screens()[0].frame().size.height) \
+                - float(y) - float(h)
+        except Exception:
+            return float(y)
+
+    def place(x, y, w, h):
+        try:
+            win.setFrame_display_(
+                NSMakeRect(float(x), _flip(y, h), float(w), float(h)), True)
+        except Exception:
+            pass
+
+    def round_corners(r):
+        """창 모서리를 카드에 맞춰 둥글게 (0 이면 각지게)."""
+        try:
+            web.setWantsLayer_(True)
+            lay = web.layer()
+            lay.setCornerRadius_(float(r))
+            lay.setMasksToBounds_(bool(r))
+        except Exception:
+            pass
+
+    def vid_apply():
+        """지금 상태대로 창을 보이거나 숨긴다."""
+        try:
+            on = bool(st["vid_on"] and st["show"] and not st["login"])
+            win.setAlphaValue_(1.0 if on else 0.0)
+            if on:
+                win.orderFrontRegardless()
+        except Exception:
+            pass
+
+    def begin_login(x, y, w, h):
+        """로그인 화면 — 평범한 창으로 바꿔 화면 안에 띄운다.
+
+        테두리 없는 창은 키 창이 못 되어 글자를 못 친다. 끝나면 그대로
+        되돌린다. 쿠키는 WebKit 저장소에 남아 다음 실행부터 적용된다.
+        """
+        st["login"] = True
+        try:
+            win.setStyleMask_(TITLED)
+            win.setTitle_("유튜브 로그인")
+            win.setLevel_(0)
+            win.setIgnoresMouseEvents_(False)
+            win.setOpaque_(True)
+            try:
+                win.setBackgroundColor_(AppKit.NSColor.windowBackgroundColor())
+            except Exception:
+                pass
+            win.setAlphaValue_(1.0)
+            round_corners(0)
+            place(x, y, w, h)
+            AppKit.NSApp().setActivationPolicy_(
+                AppKit.NSApplicationActivationPolicyRegular)
+            AppKit.NSApp().activateIgnoringOtherApps_(True)
+            win.makeKeyAndOrderFront_(None)
+        except Exception:
+            pass
+        try:
+            web.loadRequest_(NSURLRequest.requestWithURL_(
+                NSURL.URLWithString_(LOGIN_URL)))
+        except Exception:
+            pass
+
+    def end_login(signed):
+        """로그인 화면을 접고 재생 페이지로 돌아간다."""
+        if not st["login"]:
+            return
+        st["login"] = False
+        if signed is not None:
+            st["signed"] = bool(signed)
+        try:
+            win.setStyleMask_(BARE)
+            win.setOpaque_(False)
+            try:
+                win.setBackgroundColor_(AppKit.NSColor.clearColor())
+            except Exception:
+                pass
+            win.setIgnoresMouseEvents_(True)
+            AppKit.NSApp().setActivationPolicy_(
+                AppKit.NSApplicationActivationPolicyAccessory)
+        except Exception:
+            pass
+        try:
+            web.loadRequest_(NSURLRequest.requestWithURL_(
+                NSURL.URLWithString_(st["home"])))
+        except Exception:
+            pass
+        if st["vid_on"]:
+            place(*st.get("box", (0, 0, 400, 300)))
+            round_corners(st.get("radius", 0))
+            win.setLevel_(3)          # NSFloatingWindowLevel
+        else:
+            place(0, 0, 400, 300)
+            win.setLevel_(0)
+        vid_apply()
+        emit({"signed": bool(st["signed"]), "login": False})
+
+    def check_login():
+        """로그인이 끝났는지 본다 — 유튜브로 돌아왔고 계정이 붙었으면 끝."""
+        js = ("(function(){try{return (location.href.indexOf('youtube.com')>=0"
+              " && !!(window.ytcfg && ytcfg.get('LOGGED_IN')))?1:0;}"
+              "catch(e){return 0}})()")
+
+        def done(val, err):
+            try:
+                if val and int(val) == 1:
+                    end_login(True)
+            except Exception:
+                pass
+
+        try:
+            web.evaluateJavaScript_completionHandler_(js, done)
+        except Exception:
+            pass
+
+    class WinDelegate(NSObject):
+        def windowShouldClose_(self, sender):
+            # 로그인 창을 닫으면 재생기까지 죽는다 — 닫기를 취소하고
+            # 재생 페이지로 되돌린다 (윈도우 재생기와 같은 규칙).
+            try:
+                if st["login"]:
+                    end_login(None)
+                    return False
+            except Exception:
+                pass
+            return True
+
+    windel = WinDelegate.alloc().init()
+    try:
+        win.setDelegate_(windel)
+    except Exception:
+        pass
 
     def reader():
         try:
@@ -748,7 +918,13 @@ def _mac_yt_player_main():
     threading.Thread(target=reader, daemon=True).start()
 
     def pump(_timer=None):
-        if not page_ready[0]:
+        if st["login"]:
+            # 로그인 화면 — 명령은 계속 받되(quit 등) 상태 대신 로그인 확인
+            check_login()
+        # 페이지가 아직 안 떴으면 명령을 쌓아 둔다. **로그인 중에는 예외** —
+        # 그때는 재생 페이지가 아니라 구글 페이지가 떠 있으므로, 안 풀면
+        # quit·login_done 이 영영 안 처리된다.
+        if not page_ready[0] and not st["login"]:
             return
         drained = 0
         while drained < 50:
@@ -778,6 +954,52 @@ def _mac_yt_player_main():
                        % (json.dumps(v), json.dumps(lst)))
                 if st.get("vol") is not None:
                     run_js("window.ytVol(%d)" % int(st["vol"]))
+            elif k == "embed":
+                # 영상 칸에 들어간다 — 좌표는 **화면** 기준 (부모가 준다)
+                st["vid_on"] = True
+                st["show"] = bool(c.get("show", 1))
+                st["box"] = (c.get("x", 0), c.get("y", 0),
+                             c.get("w", 320), c.get("h", 180))
+                st["radius"] = c.get("r", 0)
+                if not st["login"]:
+                    place(*st["box"])
+                    round_corners(st["radius"])
+                    try:
+                        win.setLevel_(3)      # NSFloatingWindowLevel
+                        win.setIgnoresMouseEvents_(True)
+                    except Exception:
+                        pass
+                    vid_apply()
+                run_js("window.ytFit&&window.ytFit(1)")
+            elif k == "vidbox":
+                if st["vid_on"]:
+                    st["box"] = (c.get("x", 0), c.get("y", 0),
+                                 c.get("w", 320), c.get("h", 180))
+                    st["radius"] = c.get("r", st.get("radius", 0))
+                    if not st["login"]:
+                        place(*st["box"])
+                        round_corners(st["radius"])
+            elif k == "vidshow":
+                # 우리 앱이 맨 앞이 아니면 숨긴다 (남의 창 위에 뜨지 않게)
+                st["show"] = bool(c.get("on", 1))
+                if not st["login"]:
+                    vid_apply()
+            elif k == "unembed":
+                st["vid_on"] = False
+                if not st["login"]:
+                    try:
+                        win.setAlphaValue_(0.0)
+                        win.setLevel_(0)
+                    except Exception:
+                        pass
+                    round_corners(0)
+                    place(0, 0, 400, 300)
+                run_js("window.ytFit&&window.ytFit(0)")
+            elif k == "login":
+                begin_login(c.get("x", 200), c.get("y", 120),
+                            c.get("w", 560), c.get("h", 720))
+            elif k == "login_done":
+                end_login(None)
             elif k == "play":
                 run_js("window.ytPlay()")
             elif k == "pause":
@@ -11589,12 +11811,26 @@ class Mascot:
             self._yt_want = True
             self._yt_send(c="play")
 
+    def _yt_login_ok(self):
+        """이 컴퓨터에서 유튜브 로그인을 쓸 수 있는가.
+
+        맥 재생기도 이제 `login` 을 안다 — 창을 평범한 창으로 바꿔 띄우고,
+        쿠키는 WebKit 저장소에 남아 다음부터 그 계정으로 재생된다.
+        """
+        return bool(IS_WIN or IS_MAC)
+
     def _yt_login(self):
         """유튜브 로그인 창을 띄운다.
 
         로그인해 두면 그 계정으로 재생되므로, 프리미엄이면 광고가 빠진다.
-        쿠키는 캐릭터 폴더의 .ytprofile에 남아 다음부터는 저절로 들어간다.
+        쿠키는 윈도우면 캐릭터 폴더의 .ytprofile 에, 맥이면 WebKit 저장소에
+        남아 다음부터는 저절로 들어간다 (맥 재생기는 --profile 을 안 읽는다).
         """
+        if not self._yt_login_ok():
+            # 맥은 로그인 없이 그냥 재생된다 (광고는 나온다)
+            self._room_toast = ("맥은 로그인 없이 바로 들을 수 있어요",
+                                time.time())
+            return
         if not self._yt_spawn():
             self._say("음악을 켤 수 없어요.", 3.0)
             return
@@ -11605,7 +11841,7 @@ class Mascot:
         y = int(mt + max(30, (mb - mt - 720) / 2))
         self._yt_want = True
         self._yt_send(c="vol", v=int(self.us.get("yt_volume", 55)))
-        self._yt_send(c="login", x=x, y=y)
+        self._yt_send(c="login", x=x, y=y, w=560, h=720)
         # 로그인 창을 닫으면 이 곡부터 튼다 (재생기가 기억해 둔다)
         vid, lst = self._yt_ids(str(self.us.get("yt_url") or ""))
         if vid or lst:
@@ -17721,6 +17957,7 @@ class Mascot:
         self._safe("room_diag", self._room_diag, now)
         self._safe("room", self._room_tick, now)
         self._safe("pomo", self._pomo_tick, now)
+        self._safe("vid_tick", self._vid_tick, now)
         # 그림자: 본체를 따라오고, 주기적으로 z순서(본체 바로 아래) 재고정
         # 창이 실제로 움직였을 때만 따라 옮긴다. 위치가 그대로인데도 주기적으로
         # z순서를 다시 밀어넣으면 그림자가 눈에 띄게 깜빡인다.
@@ -24157,11 +24394,13 @@ class Mascot:
             return (251, 243, 247)
 
     def _vid_ok(self):
-        """영상 보기를 쓸 수 있는가 — config 로 켠 캐릭터 · 윈도우만.
+        """영상 보기를 쓸 수 있는가.
 
-        맥은 프로세스 사이에 창을 끼워 넣는 길이 없어 빠져 있다.
+        윈도우는 자식 창으로 **끼워 넣고**, 맥은 창을 그 자리로 **따라다니게**
+        한다 (맥에는 프로세스 사이 SetParent 가 없다). 둘 다 재생기 창
+        하나를 옮기는 것이라 새 창이 생기지는 않는다.
         """
-        return bool(IS_WIN and self.cfg.get("video", True))
+        return bool((IS_WIN or IS_MAC) and self.cfg.get("video", True))
 
     def _vid_on(self):
         return bool(self._vid_ok() and self.us.get("yt_video"))
@@ -24182,6 +24421,56 @@ class Mascot:
             self._vid_park()
             return
         try:
+            # 최소화·숨김이면 뗀다 (맥의 노란 단추 포함). **ismapped 로 보면
+            # 안 된다** — 창을 만든 직후 잠깐 거짓이라 첫 동기화가 통째로
+            # 죽는다 (검사가 잡았다 · 지뢰 179 와 같은 함정).
+            if not win.winfo_exists() or                     str(win.state()) in ("iconic", "withdrawn"):
+                self._vid_park()
+                return
+        except Exception:
+            return
+        # 창 안으로 자른다 — 자리 계산이 어긋나도 밖으로는 못 나간다.
+        try:
+            cw9, ch9 = int(win.winfo_width()), int(win.winfo_height())
+        except Exception:
+            cw9 = ch9 = 0
+        if cw9 > 1 and ch9 > 1:
+            bx9, by9 = max(0, int(box[0])), max(0, int(box[1]))
+            bw9 = min(int(box[0]) + int(box[2]) - bx9, cw9 - bx9)
+            bh9 = min(int(box[1]) + int(box[3]) - by9, ch9 - by9)
+            if bw9 < 8 or bh9 < 8:
+                self._vid_park()
+                return
+            box = (bx9, by9, bw9, bh9)
+        r9 = int(self._ui(self.VID_R))
+        if IS_MAC:
+            # 맥은 **화면 좌표**로 준다 (창 안에 끼워 넣는 게 아니다).
+            # 그리고 우리 앱이 맨 앞일 때만 보인다 — 남의 창 위에 영상
+            # 네모만 둥둥 뜨지 않게. 앞 창 질의는 0.5초 캐시다 (지뢰 161).
+            try:
+                rx9, ry9 = win.winfo_rootx(), win.winfo_rooty()
+            except Exception:
+                return
+            show9 = 1 if self._fg_is_self() else 0
+            want = ("mac", int(rx9 + box[0]), int(ry9 + box[1]),
+                    int(box[2]), int(box[3]), show9)
+            old = getattr(self, "_vid_at", None)
+            if want == old:
+                return
+            if old is not None and old[0] == "mac":
+                if want[1:5] != old[1:5]:
+                    ok9 = self._yt_send(c="vidbox", x=want[1], y=want[2],
+                                        w=want[3], h=want[4], r=r9)
+                else:
+                    ok9 = True
+                if want[5] != old[5]:
+                    ok9 = self._yt_send(c="vidshow", on=want[5]) and ok9
+            else:
+                ok9 = self._yt_send(c="embed", x=want[1], y=want[2],
+                                    w=want[3], h=want[4], r=r9, show=want[5])
+            self._vid_at = want if ok9 else None
+            return
+        try:
             h9 = int(win.winfo_id())
         except Exception:
             return
@@ -24191,12 +24480,38 @@ class Mascot:
             return
         if old is not None and old[0] == h9:
             ok9 = self._yt_send(c="vidbox", x=want[1], y=want[2], w=want[3],
-                                h=want[4], r=int(self._ui(self.VID_R)))
+                                h=want[4], r=r9)
         else:
             ok9 = self._yt_send(c="embed", p=h9, x=want[1], y=want[2],
-                                w=want[3], h=want[4],
-                                r=int(self._ui(self.VID_R)))
+                                w=want[3], h=want[4], r=r9)
         self._vid_at = want if ok9 else None
+
+    def _vid_tick(self, now):
+        """앞 창이 바뀌면 영상도 따라 숨는다.
+
+        보이고 숨기는 판정(`_fg_is_self`)은 창을 **다시 그릴 때만** 도는데,
+        남의 프로그램으로 넘어가는 것은 우리 창을 다시 그리지 않는다 —
+        그러면 남의 창 위에 영상만 둥둥 뜬 채로 남는다 (지뢰 147 과 같은
+        엣지 트리거). 1초에 한 번 다시 잰다. 앞 창 질의는 0.5초 캐시라
+        싸고, 자리가 그대로면 `_vid_sync` 가 곧바로 돌아온다.
+        """
+        if not IS_MAC or getattr(self, "_vid_at", None) is None:
+            return
+        if now - getattr(self, "_vid_tick_at", 0.0) < 1.0:
+            return
+        self._vid_tick_at = now
+        win9 = getattr(self, "_yt_win", None)
+        st9 = getattr(self, "_bgm_st", None)
+        if st9 is None or win9 is None:
+            self._vid_park()
+            return
+        try:
+            if not win9.winfo_exists():
+                self._vid_park()
+                return
+        except Exception:
+            return
+        self._vid_sync(win9, st9)
 
     def _vid_park(self):
         """영상 창을 떼어 다시 화면 밖으로.
@@ -24293,6 +24608,7 @@ class Mascot:
         win.resizable(not bare, not bare)
         if not bare:
             win.minsize(int(u(self.BGM_MINW)), int(u(self.BGM_MINH)))
+            win.maxsize(int(u(self.BGM_MAXW)), int(u(self.BGM_MAXH)))
         if bare:
             win.overrideredirect(True)
             try:
@@ -24331,7 +24647,13 @@ class Mascot:
                 g["preset"] = u(146)      # 프리셋 단추 줄 (요청)
                 # 영상 칸 (열었을 때) — 그만큼 목록이 아래로 내려간다
                 g["vid"] = u(188)
-                g["vidh"] = self._vid_h(W) if self._vid_on() else 0
+                vh9 = self._vid_h(W) if self._vid_on() else 0
+                if vh9:
+                    # **창이 낮으면 칸을 줄인다.** 맥 영상은 잘라 줄 부모
+                    # 창이 없어서(따로 뜬 NSWindow) 그대로 두면 창 밖으로
+                    # 삐져나와 영상만 둥둥 뜬다. 아래 조작줄 몫은 남긴다.
+                    vh9 = max(0, min(int(vh9), int(H - u(188) - u(96))))
+                g["vidh"] = vh9
                 g["list"] = u(188) + (g["vidh"] + u(self.VID_GAP)
                                       if g["vidh"] else 0)
                 # 친구 화면 — 머리말 아래부터 가름선 위까지
@@ -24890,18 +25212,26 @@ class Mascot:
             # 계정
             ay = H - u(30)
             signed = bool(self.us.get("yt_signed"))
+            can9 = self._yt_login_ok()
             self._soft_dot(cv, u(30), ay, u(4),
-                           "#8fd18f" if signed else cd["sub"])
-            cv.create_text(u(40), ay, anchor="w",
-                           text="유튜브 계정 · " + ("로그인됨" if signed
-                                                else "로그인 안 됨"),
-                           font=self._uf(8, True),
-                           fill=cd["text"] if signed else cd["sub"])
-            self._rr_soft(cv, W - u(96), ay - u(11), W - u(18), ay + u(11),
-                          u(11), fill=cd["track"], outline="", width=0)
-            cv.create_text(W - u(57), ay, text="다시 로그인",
-                           font=self._uf(8, True), fill=cd["sub"])
-            hit(W - u(96), ay - u(11), W - u(18), ay + u(11), "login")
+                           "#8fd18f" if (signed or not can9) else cd["sub"])
+            if not can9:
+                # 맥은 로그인 자리가 아예 없다 — 있는 척하지 않는다 (제보)
+                cv.create_text(u(40), ay, anchor="w",
+                               text="로그인 없이 바로 들을 수 있어요",
+                               font=self._uf(8, True), fill=cd["sub"])
+            else:
+                cv.create_text(u(40), ay, anchor="w",
+                               text="유튜브 계정 · " + ("로그인됨" if signed
+                                                    else "로그인 안 됨"),
+                               font=self._uf(8, True),
+                               fill=cd["text"] if signed else cd["sub"])
+                self._rr_soft(cv, W - u(96), ay - u(11), W - u(18),
+                              ay + u(11), u(11), fill=cd["track"],
+                              outline="", width=0)
+                cv.create_text(W - u(57), ay, text="다시 로그인",
+                               font=self._uf(8, True), fill=cd["sub"])
+                hit(W - u(96), ay - u(11), W - u(18), ay + u(11), "login")
 
         # ── 환경음 탭 ────────────────────────────────────────────────
 
@@ -25438,7 +25768,8 @@ class Mascot:
                 ent.delete(0, "end")
                 st["off"]["pl"] = maxoff(geo())
                 draw()
-                if (not self.us.get("yt_signed")
+                if (self._yt_login_ok()
+                        and not self.us.get("yt_signed")
                         and not self.us.get("yt_asked")):
                     # 처음 노래를 넣은 때 — 로그인부터 권한다 (옛 창과 같다).
                     # 로그인 창을 닫으면 기억해 둔 이 곡으로 이어진다.
@@ -25615,6 +25946,10 @@ class Mascot:
                     return
                 nw9, nh9 = int(e.width), int(e.height)
                 if (nw9, nh9) == (W, H) or nw9 < 40 or nh9 < 40:
+                    # 크기는 그대로고 **자리만** 바뀐 것 — 영상 창을
+                    # 따라 옮긴다 (맥은 창 안에 끼워 넣은 게 아니다).
+                    # 자리가 그대로면 _vid_sync 가 곧바로 돌아온다.
+                    self._safe("vid_sync", self._vid_sync, win, st)
                     return
                 W, H = nw9, nh9
                 cv.config(width=W, height=H)
@@ -25625,6 +25960,18 @@ class Mascot:
             win.bind("<Configure>",
                      lambda e: self._safe("bgm_cfg", on_cfg, e), add="+")
         cv.bind("<Leave>", lambda _e: self._safe("bgm_leave", hov_set, None))
+        # 창이 화면에 올라온 뒤 자리를 한 번 더 맞춘다. **만들 때는 늦다** —
+        # 그때 winfo_rootx() 는 아직 0 이라 영상이 엉뚱한 자리로 간다
+        # (맥은 화면 좌표로 주기 때문 · 검사가 잡았다). 최소화를 풀 때도
+        # 이 길로 다시 끼운다.
+        win.bind("<Map>",
+                 lambda e: (self._safe("vid_sync", self._vid_sync, win, st)
+                            if e.widget is win else None), add="+")
+        # 최소화(맥의 노란 단추)·숨김 — 창이 화면에서 사라지면 영상도 뗀다.
+        # 안 떼면 맥에서는 창 없이 영상만 둥둥 뜬다.
+        win.bind("<Unmap>",
+                 lambda e: (self._safe("vid_park", self._vid_park)
+                            if e.widget is win else None), add="+")
         # 어떤 길로 닫히든 떼어 낸다 (그물 — 보통은 close·min 에서 뗀다)
         win.bind("<Destroy>",
                  lambda e: (self._safe("vid_park", self._vid_park)
