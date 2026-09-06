@@ -1,5 +1,5 @@
 {
- "version": 1788719801,
+ "version": 1788721056,
  "files": {
   "mascot.py": "61ae45e44a7907bbda77d15ba073e964db0f160aca11f8a7369be77aede3bcbb",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
@@ -554,6 +554,8 @@
   "stickers/__init__.py": "d77e3dc92cb353dced8d192c140643c6458bc3901facdf2e0a0d0830fa4244b7",
   "youtube_player.py": "9bf9c57c6b368e5ccb2765fb2fca423ea766c23596b606e52bc068046c8c8eac"
  },
- "notes": [],
+ "notes": [
+  "안내"
+ ],
  "silent": true
 }
