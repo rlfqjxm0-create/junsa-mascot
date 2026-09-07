@@ -1,7 +1,7 @@
 {
- "version": 1788758018,
+ "version": 1788761529,
  "files": {
-  "mascot.py": "c5eff52b38fe9dcd8245cd98ef2ac3f7221b69fc0a7b462f9985470731adbba6",
+  "mascot.py": "09c5eec739d965afcb592b1147cacfb57cdac89352c803a6d85471752a2fca31",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -554,6 +554,9 @@
   "stickers/__init__.py": "d77e3dc92cb353dced8d192c140643c6458bc3901facdf2e0a0d0830fa4244b7",
   "youtube_player.py": "9bf9c57c6b368e5ccb2765fb2fca423ea766c23596b606e52bc068046c8c8eac"
  },
- "notes": [],
+ "notes": [
+  "뽀모도로·홈·쪽지함이 기본 테마에서도 OS 표시줄 대신 오른쪽 위 – □ × 단추예요 (□ 는 화면에 꽉 채우기, 위 띠를 잡아 옮기고 가장자리를 잡아 늘여요)",
+  "표시줄 없는 창의 네 모서리가 둥글어요"
+ ],
  "silent": true
 }
