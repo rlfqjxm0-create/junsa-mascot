@@ -1,7 +1,7 @@
 {
- "version": 1789053078,
+ "version": 1789064598,
  "files": {
-  "mascot.py": "7916b569cb18687ec9e0047a700d8e0175b49bb78dfce2182d028f98237f91c4",
+  "mascot.py": "90cdc51b6f808413ff35ee014599ba2ee5acd1a45b0bcd7fa852478b07bc5a4f",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -595,10 +595,6 @@
   "stickers/__init__.py": "d77e3dc92cb353dced8d192c140643c6458bc3901facdf2e0a0d0830fa4244b7",
   "youtube_player.py": "41c1ed27c7ffe17a489621285955c7ff33ad5ee5dae18b68b8e0caef678058e5"
  },
- "notes": [
-  "캐릭터 움직임이 더 부드러워졌어요 — 프레임 간격을 윈도우 타이머 해상도까지 맞춤 (30·60fps)",
-  "창 속 도형 가장자리가 매끈해졌어요 — 브리핑 시계·환경설정 장식·홈 별·게임 색종이·음표 이펙트",
-  "플레이리스트 영상 보기 고침 — 막힌 곡에서 유튜브 창이 통째로 보이거나 까맣게 나오던 것, 영상 아래 재생 위치 바(끌어서 이동), 자막은 기본 끄기",
-  "타자 소리에 무접점 키보드 'hanseoung TICO' 추가 — 스페이스·엔터·쉬프트·백스페이스도 소리가 여럿"
- ]
+ "notes": [],
+ "silent": true
 }
