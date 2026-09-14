@@ -1,7 +1,7 @@
 {
- "version": 1789394152,
+ "version": 1789416610,
  "files": {
-  "mascot.py": "b013f6ec7fa02508797731e6ffaa088e7949e5a9d9f7a9ff3352d00b3ce24b14",
+  "mascot.py": "76ff6e372b01df85f533811f25ba1a43587dad7648c1e685b79e9e1aaa5e69c7",
   "parts_junsa/arm_key.png": "c021ee2f7e47d89986e10ba611688ba36064c84431a33eba7f9402594181bda5",
   "parts_junsa/arm_pen.png": "56fece2b2de006edbebd037fa0b30813908608cb63110c4999fa81467688ac99",
   "parts_junsa/arm_right.png": "51fb928a5d13a6e9ce595ef5dff1371eee14e5ecdc5676e60c9b0765d2835bee",
@@ -13,7 +13,7 @@
   "parts_junsa/chip_meta.json": "19d1e6c8695852c7445dbb541df4050fb3d0ca7eb0fcbfb71f30cd96c3c757d2",
   "parts_junsa/chip_movie.png": "43bfa1493af45a8adc05b455acda466b56cad4394229cd8a706ae5cde09ed642",
   "parts_junsa/chip_spoon.png": "9c1f69af5de27a78fcff161bc8cacbe21aa3ce8cc5b8ea8294517ae23925f08f",
-  "parts_junsa/config.json": "8d28a345af03b6bc2052cdaee85c4ac91a7b9d36e494888be2794d47bcbf33b8",
+  "parts_junsa/config.json": "240e14f411e193568b287d1c6179deaf6d4df4979b1190929f1d66530a269cab",
   "parts_junsa/config.json.bak": "72c9517ccb72ee594cfd65d93f6c02d51425eeb6c14daf55bed7e858530b1df1",
   "parts_junsa/crown.png": "b1b7426a0222ac294a782cb06db6c9c4aba4e660591dd1761dc9e4da050175fc",
   "parts_junsa/desk.png": "8671bad069fe53399df68ebfe6a1a1a298e9aa4c26f1bd8df3016b5bb79fb76f",
@@ -596,9 +596,9 @@
   "youtube_player.py": "cfe04eb4c6a7fb3f9470ad1cf539d384341bf104fb10ba891d430952cf2f6efe"
  },
  "notes": [
-  "**캐릭터가 다른 창 아래로 내려가던 것 고침 (항상 위 고정).** 앞 창이 바뀌는 순간을 윈도우가 바로 알려 주는 신호를 받아 그때 곧바로 올라와요. 예전엔 1초마다 훑다가 클립스튜디오 팔레트처럼 '항상 위'인 창에 몇 번 지면 60초를 통째로 포기해서, 그동안 아래에 묻힌 채였어요 (제보 감사해요)",
-  "항상 위 고정 — 창을 눌러서 덮인 건 '진 것'으로 안 세고 그때마다 다시 올라와요. 스스로 계속 되올리는 창(펜 입력판 같은)하고만 5·15·30·60초로 쉬어 가며 다시 해 봐요. 컴퓨터 부하는 오히려 줄었어요 (훑는 간격 1초 → 3초, 나머지는 신호로)",
-  "말풍선·할 일·마감 말풍선, 우클릭 메뉴·환경설정 창은 그대로 캐릭터 위에 있어요 — 같은 프로그램의 창은 건드리지 않고, 메뉴가 떠 있는 동안은 올리지 않아요",
-  "**캐릭터 대사 30종 추가** — 캐릭터마다 새로운 말 30가지가 늘었어요. 캐릭터를 누르면 나와요"
+  "**토마토 탑이 생겼어요** — 뽀모도로 창 '이번 주 같이한 친구' 아래 '쌓인 토마토 보러가기'를 누르면, 같이한 친구들 머리 위에 같이 집중한 횟수만큼 토마토가 쌓여요. 1등은 가운데(꼭대기에 새), 2등은 기우뚱, 하늘엔 구름이 흘러가요. 여섯 넘으면 ‹ › 로 넘기고 지난주도 볼 수 있어요",
+  "**우클릭 메뉴 고침** — 메뉴를 읽느라 가만히 있으면 3초 뒤 캐릭터 뒤로 숨던 것을 고쳤고, 메뉴가 뜬 채로 다른 곳을 누르거나 다시 우클릭하면 닫혀요",
+  "**뽀모도로 창이 가벼워졌어요** — 바뀐 것이 없으면 다시 그리지 않아요(전엔 0.5초마다 통째로). 탭을 바꿀 때 작게 떴다가 커지던 것도 곧바로 제 크기로 · 건너뛰기·처음으로 같은 단추는 흰 바탕에 굵은 글자",
+  "데드라인 시계 — 시각이 된 뒤 10분 안에 '끝냈어'를 누르면 늦은 것으로 치지 않아요 · 최근 기록 라벨은 성공·늦음·실패 · 친구 말풍선의 조사를 이름에 맞춰요(사가와·하독과)"
  ]
 }
